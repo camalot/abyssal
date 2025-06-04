@@ -1,37 +1,57 @@
 ---
 version: 1
+settings:
+  retrievers:
+    helm:
+      selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
+      entries: '.entries["{{ .ChartName }}"][0] | .version'
+  notifiers:
+    github:
+      enabled: false
+    slack:
+      enabled: false
+    discord:
+      enabled: false
+    email:
+      enabled: false
+    jira:
+      enabled: false
+
 packages:
   - name: prometheus-stack
     repoUrl: https://prometheus-community.github.io/helm-charts
     chartName: kube-prometheus-stack
-    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
     type: helm
-    # .entries["kube-prometheus-stack"][0] | .version
-    directory: "/"
+    directory: "./sample"
     schedule:
       - cron: "0 0 * * *"
       - interval: "daily"
+
   - name: prometheus-consul-exporter
     repoUrl: https://prometheus-community.github.io/helm-charts
     chartName: prometheus-consul-exporter
-    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
     type: helm
-    # .entries["prometheus-consul-exporter"][0] | .version
+    directory: "./sample"
+
   - name: redis
     chartName: redis-cluster
     repoUrl: https://charts.bitnami.com/bitnami
-    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
     type: helm
-    # .entries["redis"][0] | .version
+    directory: "./sample"
+
   - name: azureadPodIdentity
     chartName: aad-pod-identity
     repoUrl: https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts/
-    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
     type: helm
-    # .entries["azureadPodIdentity"][0] | .version
+    directory: "./sample"
+
   - name: vault
     chartName: vault
     repoUrl: https://helm.releases.hashicorp.com
-    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
     type: helm
-    # .entries["vault"][0] | .version
+    directory: "./sample"

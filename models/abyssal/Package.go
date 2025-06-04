@@ -14,13 +14,14 @@ package abyssal
 */
 
 type AbyssalPackage struct {
-	Name      string `yaml:"name"`
-	RepoUrl   string `yaml:"repoUrl"`
-	ChartName string `yaml:"chartName"`
-	Selector  string `yaml:"selector"`
-	Type      string `yaml:"type"`
-	Directory string `yaml:"directory"`
-	Schedule  []struct {
+	Name          string `yaml:"name"`
+	RepoUrl       string `yaml:"repoUrl"`
+	ChartName     string `yaml:"chartName"`
+	HelmSelector  string `yaml:"entries,omitempty"` // Optional, used for Helm packages
+	ValueSelector string `yaml:"selector,omitempty"` // Optional, used for Helm packages
+	Type          string `yaml:"type"`
+	Directory     string `yaml:"directory"`
+	Schedule      []struct {
 		Cron string `yaml:"cron"`
 	} `yaml:"schedule"`
 }

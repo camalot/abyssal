@@ -16,17 +16,16 @@ var CheckCmd = &cobra.Command{
 
 		r := retrievers.NewHelmRetriever()
 		for _, pkg := range Config.Packages {
-			logrus.Infof("Checking package: %s", pkg.Name)
 			// Check each package for updates
-			outdated, result, err := r.OutOfDateVersion(pkg)
+			outdated, current, expected, err := r.CheckVersionOutOfDate(pkg)
 			if err != nil {
-				logrus.Errorf("Error checking package %s: %v", pkg.Name, err)
+				Logger.Errorf("Error checking package %s: %v", pkg.Name, err)
 				continue
 			}
 			if outdated {
-				logrus.Warnf("Package %s is out of date! Latest version: %s", pkg.Name, result)
+				Logger.Warnf("%s is out of date! Current version: %s - Latest version: %s", pkg.Name, current, expected)
 			} else {
-				logrus.Infof("Package %s is up to date.", pkg.Name)
+				Logger.Infof("%s is up to date.", pkg.Name)
 			}
 		}
 	},

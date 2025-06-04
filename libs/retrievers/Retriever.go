@@ -1,5 +1,5 @@
 package retrievers
 
 type Retriever interface {
-	OutOfDateVersion(pkg interface{}) (bool, string, error)
+	CheckVersionOutOfDate(pkg interface{}) (needsUpdate bool, current string, expected string, error error)
 }
