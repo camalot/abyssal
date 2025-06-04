@@ -1,0 +1,37 @@
+---
+version: 1
+packages:
+  - name: prometheus-stack
+    repoUrl: https://prometheus-community.github.io/helm-charts
+    chartName: kube-prometheus-stack
+    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    type: helm
+    # .entries["kube-prometheus-stack"][0] | .version
+    directory: "/"
+    schedule:
+      - cron: "0 0 * * *"
+      - interval: "daily"
+  - name: prometheus-consul-exporter
+    repoUrl: https://prometheus-community.github.io/helm-charts
+    chartName: prometheus-consul-exporter
+    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    type: helm
+    # .entries["prometheus-consul-exporter"][0] | .version
+  - name: redis
+    chartName: redis-cluster
+    repoUrl: https://charts.bitnami.com/bitnami
+    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    type: helm
+    # .entries["redis"][0] | .version
+  - name: azureadPodIdentity
+    chartName: aad-pod-identity
+    repoUrl: https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts/
+    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    type: helm
+    # .entries["azureadPodIdentity"][0] | .version
+  - name: vault
+    chartName: vault
+    repoUrl: https://helm.releases.hashicorp.com
+    selector: .applications.{{ .name }} | select(.chartName = \"{{ .chartName }}\") | .targetRevision
+    type: helm
+    # .entries["vault"][0] | .version
