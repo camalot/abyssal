@@ -47,7 +47,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&noColor, "no-color", "!", false, "Disable color output")
 	viper.BindPFlag("no-color", RootCmd.PersistentFlags().Lookup("no-color"))
 
-	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "set the log level (debug, info, warn, error, fatal, panic)")
+	RootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "debug", "set the log level (debug, info, warn, error, fatal, panic)")
 	viper.BindPFlag("log-level", RootCmd.PersistentFlags().Lookup("log-level"))
 	logLevel, err := logrus.ParseLevel(viper.GetString("log-level"))
 

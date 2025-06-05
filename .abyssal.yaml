@@ -1,9 +1,10 @@
 ---
 version: 1
 settings:
-  retrievers:
+  
+  providers:
     helm:
-      selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
+      # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
       entries: '.entries["{{ .ChartName }}"][0] | .version'
   notifiers:
     github:
@@ -17,41 +18,7 @@ settings:
     jira:
       enabled: false
 
-packages:
-  - name: prometheus-stack
-    repoUrl: https://prometheus-community.github.io/helm-charts
-    chartName: kube-prometheus-stack
-    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
-    type: helm
+providers:
+  - name: helm
     directory: "./sample"
-    schedule:
-      - cron: "0 0 * * *"
-      - interval: "daily"
-
-  - name: prometheus-consul-exporter
-    repoUrl: https://prometheus-community.github.io/helm-charts
-    chartName: prometheus-consul-exporter
-    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
-    type: helm
-    directory: "./sample"
-
-  - name: redis
-    chartName: redis-cluster
-    repoUrl: https://charts.bitnami.com/bitnami
-    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
-    type: helm
-    directory: "./sample"
-
-  - name: azureadPodIdentity
-    chartName: aad-pod-identity
-    repoUrl: https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts/
-    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
-    type: helm
-    directory: "./sample"
-
-  - name: vault
-    chartName: vault
-    repoUrl: https://helm.releases.hashicorp.com
-    # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
-    type: helm
-    directory: "./sample"
+    selector: '.. | select(.chartName != null and .repoURL != null) | [{"chartName": .chartName, "repoURL": .repoURL, "targetRevision": .targetRevision}]'
