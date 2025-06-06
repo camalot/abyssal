@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/camalot/abyssal/config"
+	"github.com/camalot/abyssal/libs/envs"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -34,11 +35,13 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
+	var err error
+	// Load environment variables from .env file
+	envs.LoadDotEnv("./.env")
 	viper.BindPFlag("config", RootCmd.PersistentFlags().Lookup("config"))
 	RootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "./.abyssal.yaml", "config file (default is .abyssal.yaml)")
 
 	Config = &config.AppConfiguration{}
-	var err error
 	err = Config.Load(configFile)
 	if err != nil {
 		logrus.Fatalln("Error loading config file", err)
@@ -52,7 +55,7 @@ func init() {
 	logLevel, err := logrus.ParseLevel(viper.GetString("log-level"))
 
 	Logger = &logrus.Logger{
-		Out:  logrus.StandardLogger().Out,
+		Out:   logrus.StandardLogger().Out,
 		Level: logLevel,
 		Formatter: &easy.Formatter{
 			LogFormat: "[%lvl%] %msg%\n",
@@ -74,6 +77,5 @@ func init() {
 	// 	// },
 	// 	// DisableTimestamp: true,
 	// })
-
 
 }

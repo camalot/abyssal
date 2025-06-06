@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"crypto/md5"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	// "github.com/camalot/abyssal/models/abyssal"
+	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/templates"
 	"github.com/camalot/abyssal/models/helm"
 	"github.com/hashicorp/go-version"
@@ -23,15 +25,26 @@ import (
 )
 
 type HelmProvider struct {
-	Directory string                 `yaml:"directory"`
-	Selector  string                 `yaml:"selector"`
-	Targets   []helm.HelmChartTarget `yaml:"targets"`
+	Directory string `yaml:"directory"`
+	Selector  string `yaml:"selector"`
 
-	HelmSelector  string `yaml:"helmSelector"`
+	Targets         []helm.HelmChartTarget `yaml:"targets"`
+	Evaluator       string                 `yaml:"evaluator"`
+	EntriesSelector string                 `yaml:"entries"`
+
+	config *config.AppConfiguration `yaml:"-"`
+	UseCache bool `yaml:"-"`
 }
 
-func NewHelmProvider() *HelmProvider {
-	return &HelmProvider{}
+func NewHelmProvider(config *config.AppConfiguration) *HelmProvider {
+	return &HelmProvider{
+		Selector:        config.Settings.Providers.Helm.BaseSelector,
+		EntriesSelector: config.Settings.Providers.Helm.EntriesSelector,
+		Evaluator:       config.Settings.Providers.Helm.EvaluatorSelector,
+
+		config: config,
+		UseCache: true,
+	}
 }
 
 func (p *HelmProvider) getFilesRecursive(dir string) ([]string, error) {
@@ -84,10 +97,12 @@ func (p *HelmProvider) Load() error {
 			PrintDocSeparators: false,
 		}
 
+		evaluatorTemplate := templates.NewTemplate("evaluator", p.Evaluator, p)
+
 		logging.SetLevel(logging.CRITICAL, "") // Set logging level to critical to suppress yq logs
 		encoder := yq.NewYamlEncoder(*ymlPrefs)
 		decoder := yq.NewYamlDecoder(*ymlPrefs)
-		query := p.Selector
+		query, _ := evaluatorTemplate.Render()
 
 		// logrus.Debugf("Evaluating query '%s' on index.yaml", query)
 		evaluator := yq.NewStringEvaluator()
@@ -123,23 +138,23 @@ func (p *HelmProvider) CheckVersionOutOfDate(target helm.HelmChartTarget) (bool,
 	}
 
 	// Fetch the index.yaml file from the Helm repository
-	// this shoudl cache the index.yaml file in the future
-	entriesYaml, err := getURLContent(entriesUrl)
+	// this should cache the index.yaml file in the future
+	entriesYaml, err := p.getURLContent(strings.TrimSpace(target.RepoURL), "index.yaml")
 	if err != nil {
 		return false, "", "", fmt.Errorf("failed to fetch index.yaml from %s: %w", entriesUrl, err)
 	}
-	queryTemplate := templates.NewTemplate("query", p.HelmSelector, target)
+	queryTemplate := templates.NewTemplate("query", p.EntriesSelector, target)
 	query, err := queryTemplate.Render()
 	if err != nil {
 		return false, "", "", fmt.Errorf("failed to render query template: %w", err)
 	}
 
 	ymlPrefs := &yq.YamlPreferences{
-		Indent: 2,
-		EvaluateTogether: false,
-		UnwrapScalar: false,
-		ColorsEnabled: !true, // Disable colors for output
-		PrintDocSeparators: false,
+		Indent:                      2,
+		EvaluateTogether:            false,
+		UnwrapScalar:                false,
+		ColorsEnabled:               !true, // Disable colors for output
+		PrintDocSeparators:          false,
 		LeadingContentPreProcessing: false,
 	}
 	encoder := yq.NewYamlEncoder(*ymlPrefs)
@@ -148,20 +163,23 @@ func (p *HelmProvider) CheckVersionOutOfDate(target helm.HelmChartTarget) (bool,
 	// logrus.Debugf("Evaluating query '%s' on index.yaml", query)
 	evaluator := yq.NewStringEvaluator()
 	result, err := evaluator.Evaluate(query, string(entriesYaml), encoder, decoder)
+
 	if err != nil {
 		return false, "", "", fmt.Errorf("failed to evaluate query '%s' on index.yaml: %w", query, err)
 	}
 	// trim the result to get the version string
 	if result == "" {
-		fmt.Println(string(entriesYaml))
 		return false, "", "", fmt.Errorf("no result found for query '%s' on index.yaml", query)
 	}
-	
+
+	logrus.Debugf("Result of query '%s': %s\n", query, result)
+
 	result = cleanValueForVersion(strings.Trim(strings.TrimSpace(result), "\n"))
-	
+
 	expectedVersion, err := version.NewVersion(result)
 	if err != nil {
-		return false, "", "", fmt.Errorf("failed to parse version '%s': %w", result, err)
+		logrus.Debugln(string(entriesYaml))
+		return false, "", "", fmt.Errorf("failed to parse expectedVersion '%s': %w", result, err)
 	}
 	currentVersion, err := version.NewVersion(target.TargetRevision)
 	if err != nil {
@@ -179,20 +197,153 @@ func (p *HelmProvider) CheckVersionOutOfDate(target helm.HelmChartTarget) (bool,
 	}
 }
 
+func (p *HelmProvider) writeCachedContent(cacheKey []byte, content []byte) error {
+	if !p.UseCache {
+		logrus.Debugf("Cache is disabled, not writing content for %x", cacheKey)
+		return nil // return nil to indicate that we are not caching
+	}
+	cacheFilePath := path.Join(os.TempDir(), fmt.Sprintf("%x.yaml", cacheKey))
+	// write the content to the cache file
+	if err := os.WriteFile(cacheFilePath, content, 0644); err != nil {
+		return fmt.Errorf("failed to write cache file %s: %w", cacheFilePath, err)
+	}
+	logrus.Debugf("Cached content for %x at %s", cacheKey, cacheFilePath)
+	return nil
+}
 
+func (p *HelmProvider) getCachedContent(cacheKey []byte, contentURL string) ([]byte, error) {
+	if !p.UseCache {
+		logrus.Debugf("Cache is disabled, fetching content from %s", contentURL)
+		return nil, nil // return nil to indicate that we need to fetch the content
+	}
+	
+	cacheFilePath := path.Join(os.TempDir(), fmt.Sprintf("%x.yaml", cacheKey))
+	// check if the cache file exists
+	if fileInfo, err := os.Stat(cacheFilePath); err == nil {
+		// check if the cache file is older than 24 hours
+		if time.Since(fileInfo.ModTime()) < 24*time.Hour {
+			// read the cache file
+			content, err := os.ReadFile(cacheFilePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read cache file %s: %w", cacheFilePath, err)
+			}
+			logrus.Debugf("Cache hit for %s, returning cached content", contentURL)
+			return content, nil
+		} else {
+			logrus.Debugf("Cache file %s is older than 24 hours, fetching new content", cacheFilePath)
+			// if the cache file is older than 24 hours, delete it
+			if err := os.Remove(cacheFilePath); err != nil {
+				return nil, fmt.Errorf("failed to remove old cache file %s: %w", cacheFilePath, err)
+			}
+		}
+	}
 
-func getURLContent(url string) ([]byte, error) {
+	logrus.Debugf("Cache miss for %s, fetching from URL", contentURL)
+	return nil, nil // return nil to indicate that we need to fetch the content
+}
+
+func (p *HelmProvider) getURLContent(baseUrl string, pathSegments ...string) ([]byte, error) {
+	// Normalize the URL to ensure it matches the keys in the authentication map
+	normalizedBaseUrl, _ := url.Parse(baseUrl)
+	contentURL := normalizedBaseUrl.JoinPath(pathSegments...) // Join the base URL with the path segments
+
+	// create MD5 hash of the URL to use as a cache key
+	cacheKey := md5.Sum([]byte(contentURL.String()))
+
+	content, err := p.getCachedContent(cacheKey[:], contentURL.String())
+	if content != nil {
+		return content, err
+	}
 
 	client := &http.Client{
-		Timeout: time.Duration(time.Duration(10).Seconds()), // Set a timeout for the HTTP request
+		Timeout: 10 * time.Second, // Set a timeout for the HTTP request
 	}
 
-	resp, err := client.Get(url)
+	// do we have auth info for this URL?
+	// check if p.config.Settings.Authentication is not nil and has a key for the URL
+	if p.config.Settings.Authentication != nil {
+		authType := ""
+		// check if Authentication map has an entry for this URL
+		auth, ok := p.config.Settings.Authentication[normalizedBaseUrl.String()]
+		if ok {
+			authType = strings.ToLower(auth.Type)
+			switch authType {
+			case "basic":
+				client = &http.Client{
+					Transport: &basicAuthTransport{
+						base:     http.DefaultTransport,
+						username: p.envTemplateValue(auth.Username),
+						password: p.envTemplateValue(auth.Password),
+					},
+					Timeout: 10 * time.Second,
+				}
+
+			case "token":
+				client = &http.Client{
+					Transport: &authTransport{
+						base:       http.DefaultTransport,
+						authHeader: fmt.Sprintf("Token %s", p.envTemplateValue(auth.Token)),
+					},
+					Timeout: 10 * time.Second,
+				}
+
+			case "bearer":
+				token := p.envTemplateValue(auth.Token)
+				if token == "" {
+					return nil, fmt.Errorf("Bearer token is empty for %s", normalizedBaseUrl.String())
+				}
+				client = &http.Client{
+					Transport: &authTransport{
+						base:       http.DefaultTransport,
+						authHeader: fmt.Sprintf("Bearer %s", token),
+					},
+					Timeout: 10 * time.Second,
+				}
+			default:
+			}
+		}
+	}
+
+	resp, err := client.Get(contentURL.String())
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	finalContent, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body from %s: %w", contentURL.String(), err)
+	}
+	err = p.writeCachedContent(cacheKey[:], finalContent)
+	if err != nil {
+		logrus.Errorf("Failed to write cache content for %s: %v", contentURL.String(), err)
+	}
+	return finalContent, nil
+}
+
+type HelmProviderAuthenticationTemplateData struct {
+	EnvironmentVariables map[string]string
+}
+
+func (p *HelmProvider) envTemplateValue(template string) string {
+	// This function should implement the logic to render a template with environment variables
+	// create a map of environment variables from os.Environ
+	envVars := make(map[string]string)
+
+	for _, env := range os.Environ() {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			// fmt.Printf("Adding env var: %s=%s\n", parts[0], parts[1])
+			envVars[parts[0]] = parts[1]
+		}
+	}
+	result := templates.NewTemplate("templated-value", template, &HelmProviderAuthenticationTemplateData{
+		EnvironmentVariables: envVars,
+	})
+	rendered, err := result.Render()
+	if err != nil {
+		return template
+	}
+	return rendered
 }
 
 func cleanValueForVersion(value string) string {
@@ -215,4 +366,26 @@ func cleanValueForVersion(value string) string {
 	// }
 
 	return value
+}
+
+type authTransport struct {
+	base       http.RoundTripper
+	authHeader string
+}
+
+func (a *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("Authorization", a.authHeader)
+	return a.base.RoundTrip(req)
+}
+
+// For Basic Auth
+type basicAuthTransport struct {
+	base     http.RoundTripper
+	username string
+	password string
+}
+
+func (b *basicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.SetBasicAuth(b.username, b.password)
+	return b.base.RoundTrip(req)
 }

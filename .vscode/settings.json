@@ -1,5 +1,11 @@
 {
   "cSpell.words": [
-    "logrus"
+    "Debugf",
+    "Debugln",
+    "godotenv",
+    "Infof",
+    "joho",
+    "logrus",
+    "Warnf"
   ]
 }

@@ -1,14 +1,23 @@
 ---
 version: 1
 settings:
-  
   providers:
     helm:
-      # selector: '.applications.{{ .Name }} | select(.chartName = "{{ .ChartName }}") | .targetRevision'
       entries: '.entries["{{ .ChartName }}"][0] | .version'
+      evaluator: '{{ .Selector }} | to_entries | .[] | select(.value.chartName!=null and .value.repoURL!=null and .value.targetRevision!=null) | [{"chartName": .value.chartName, "repoURL": .value.repoURL, "targetRevision": .value.targetRevision}]'
+      selector: '.cloudimanage.applications'
+
+  authentication:
+    "https://artifactory.imanage.com/artifactory/helm":
+      type: "bearer"
+      # sets the token from the environment variable ARTIFACTORY_TOKEN
+      token: "{{ .EnvironmentVariables.ARTIFACTORY_TOKEN }}"
   notifiers:
     github:
       enabled: false
+      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      body: |
+        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
     slack:
       enabled: false
     discord:
@@ -17,8 +26,9 @@ settings:
       enabled: false
     jira:
       enabled: false
+  
 
 providers:
-  - name: helm
+  - type: helm
     directory: "./sample"
-    selector: '.. | select(.chartName != null and .repoURL != null) | [{"chartName": .chartName, "repoURL": .repoURL, "targetRevision": .targetRevision}]'
+    selector: '.cloudimanage.applications'
