@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	// "github.com/camalot/abyssal/models/abyssal"
 	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/templates"
 	"github.com/camalot/abyssal/models/helm"
@@ -32,8 +31,8 @@ type HelmProvider struct {
 	Evaluator       string                 `yaml:"evaluator"`
 	EntriesSelector string                 `yaml:"entries"`
 
-	config *config.AppConfiguration `yaml:"-"`
-	UseCache bool `yaml:"-"`
+	config   *config.AppConfiguration `yaml:"-"`
+	UseCache bool                     `yaml:"-"`
 }
 
 func NewHelmProvider(config *config.AppConfiguration) *HelmProvider {
@@ -42,7 +41,7 @@ func NewHelmProvider(config *config.AppConfiguration) *HelmProvider {
 		EntriesSelector: config.Settings.Providers.Helm.EntriesSelector,
 		Evaluator:       config.Settings.Providers.Helm.EvaluatorSelector,
 
-		config: config,
+		config:   config,
 		UseCache: true,
 	}
 }
@@ -76,7 +75,6 @@ func (p *HelmProvider) GetFiles() []string {
 }
 
 func (p *HelmProvider) Load() error {
-
 	// get all yaml files in the directory
 	// parse each file and load the targets
 	targets := []helm.HelmChartTarget{}
@@ -216,7 +214,7 @@ func (p *HelmProvider) getCachedContent(cacheKey []byte, contentURL string) ([]b
 		logrus.Debugf("Cache is disabled, fetching content from %s", contentURL)
 		return nil, nil // return nil to indicate that we need to fetch the content
 	}
-	
+
 	cacheFilePath := path.Join(os.TempDir(), fmt.Sprintf("%x.yaml", cacheKey))
 	// check if the cache file exists
 	if fileInfo, err := os.Stat(cacheFilePath); err == nil {

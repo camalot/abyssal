@@ -18,6 +18,7 @@ settings:
       title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
       body: |
         Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+      token: "{{ .EnvironmentVariables.GITHUB_TOKEN }}"
     slack:
       enabled: false
     discord:
