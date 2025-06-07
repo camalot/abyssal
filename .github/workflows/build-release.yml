@@ -6,7 +6,7 @@ name: Build and Release
 permissions: {}
 env:
   PROJECT_NAME: '${{ github.event.repository.name }}'
-  ORGANIZATION: '${{ github.event.repository.owner }}'
+  ORGANIZATION: '${{ github.event.repository.owner.login }}'
 jobs:
   # call the lint job to lint the code
   lint:

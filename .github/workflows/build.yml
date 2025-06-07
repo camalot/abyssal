@@ -23,7 +23,7 @@ name: Build
 permissions: {}
 env:
   PROJECT_NAME: '${{ github.event.repository.name }}'
-  ORGANIZATION: '${{ github.event.repository.owner }}'
+  ORGANIZATION: '${{ github.event.repository.owner.login }}'
 jobs:
   build:
     runs-on: ubuntu-latest
