@@ -17,11 +17,11 @@ type AppConfiguration struct {
 			Jira    map[string]interface{} `yaml:"jira"`
 		} `yaml:"notifiers"`
 		Providers struct {
-			Helm struct {
+			ArgoAppOfApps struct {
 				EntriesSelector   string `yaml:"entries"`
 				EvaluatorSelector string `yaml:"evaluator"`
 				BaseSelector      string `yaml:"selector"`
-			} `yaml:"helm"`
+			} `yaml:"argo-aoa"`
 		} `yaml:"providers"`
 		Authentication map[string]AuthenticationElement `yaml:"authentication"`
 	} `yaml:"settings"`
@@ -29,8 +29,8 @@ type AppConfiguration struct {
 }
 
 type ProviderElement struct {
-	Type  string                 `yaml:"type"`
-	Extra map[string]interface{} `yaml:",inline"`
+	Type     string                 `yaml:"type"`
+	Extra    map[string]interface{} `yaml:",inline"`
 }
 
 type AuthenticationElement struct {

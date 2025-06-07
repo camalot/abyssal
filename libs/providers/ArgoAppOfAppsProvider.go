@@ -13,7 +13,6 @@ import (
 
 	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/templates"
-	"github.com/camalot/abyssal/models/helm"
 	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/op/go-logging.v1"
@@ -22,30 +21,57 @@ import (
 	yq "github.com/mikefarah/yq/v4/pkg/yqlib"
 )
 
-type HelmProvider struct {
+type ArgoAppOfAppsProvider struct {
 	Directory string `yaml:"directory"`
 	Selector  string `yaml:"selector"`
 
-	Targets         []helm.HelmChartTarget `yaml:"targets"`
-	Evaluator       string                 `yaml:"evaluator"`
-	EntriesSelector string                 `yaml:"entries"`
+	Targets         []ProviderTarget `yaml:"targets"`
+	Evaluator       string           `yaml:"evaluator"`
+	EntriesSelector string           `yaml:"entries"`
+
+	TargetNameFrom string `yaml:"nameFrom,omitempty"` // used to set the name of the target from a field in the target map
 
 	config   *config.AppConfiguration `yaml:"-"`
 	UseCache bool                     `yaml:"-"`
 }
 
-func NewHelmProvider(config *config.AppConfiguration) *HelmProvider {
-	return &HelmProvider{
-		Selector:        config.Settings.Providers.Helm.BaseSelector,
-		EntriesSelector: config.Settings.Providers.Helm.EntriesSelector,
-		Evaluator:       config.Settings.Providers.Helm.EvaluatorSelector,
+func NewArgoAppOfAppsProvider(providerElement config.ProviderElement, config *config.AppConfiguration) *ArgoAppOfAppsProvider {
+	p := &ArgoAppOfAppsProvider{
+		Selector:        config.Settings.Providers.ArgoAppOfApps.BaseSelector,
+		EntriesSelector: config.Settings.Providers.ArgoAppOfApps.EntriesSelector,
+		Evaluator:       config.Settings.Providers.ArgoAppOfApps.EvaluatorSelector,
+
+		TargetNameFrom: "chartName",
 
 		config:   config,
 		UseCache: true,
 	}
+	if providerElement.Extra["useCache"] != nil {
+		if useCache, ok := providerElement.Extra["useCache"].(bool); ok {
+			p.UseCache = useCache
+		} else {
+			p.UseCache = true
+		}
+	} else {
+		p.UseCache = true // default to true if not set
+	}
+
+	if providerElement.Extra["directory"] == nil {
+		p.Directory = "./"
+	} else if dir, ok := providerElement.Extra["directory"].(string); ok {
+		p.Directory = dir
+	} else {
+		p.Directory = "./" // default to current directory if not set or invalid
+	}
+	if providerElement.Extra["selector"] != nil {
+		p.Selector = providerElement.Extra["selector"].(string)
+	} else {
+		p.Selector = config.Settings.Providers.ArgoAppOfApps.BaseSelector
+	}
+	return p
 }
 
-func (p *HelmProvider) getFilesRecursive(dir string) ([]string, error) {
+func (p *ArgoAppOfAppsProvider) getFilesRecursive(dir string) ([]string, error) {
 	var files []string
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -65,7 +91,7 @@ func (p *HelmProvider) getFilesRecursive(dir string) ([]string, error) {
 	return files, nil
 }
 
-func (p *HelmProvider) GetFiles() []string {
+func (p *ArgoAppOfAppsProvider) GetFiles() []string {
 	files, err := p.getFilesRecursive(p.Directory)
 	if err != nil {
 		return nil
@@ -73,10 +99,10 @@ func (p *HelmProvider) GetFiles() []string {
 	return files
 }
 
-func (p *HelmProvider) Load() error {
+func (p *ArgoAppOfAppsProvider) Load() error {
 	// get all yaml files in the directory
 	// parse each file and load the targets
-	targets := []helm.HelmChartTarget{}
+	targets := []ProviderTarget{}
 	files := p.GetFiles()
 	for _, file := range files {
 		content, err := os.ReadFile(file)
@@ -84,7 +110,7 @@ func (p *HelmProvider) Load() error {
 			return err
 		}
 		// parse the content and load the targets
-		var chart []helm.HelmChartTarget
+		var target []ProviderTarget
 
 		ymlPrefs := &yq.YamlPreferences{
 			Indent:             2,
@@ -113,27 +139,64 @@ func (p *HelmProvider) Load() error {
 		}
 
 		// result is a YAML String of []HelmChartTarget
-		err = yaml.Unmarshal([]byte(result), &chart)
+		err = yaml.Unmarshal([]byte(result), &target)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal YAML for query '%s': %w", query, err)
 		}
 
-		targets = append(targets, chart...)
+		// set the name of the target from the targetNameFrom field
+		for i := range target {
+			if p.TargetNameFrom != "" {
+				if name, ok := target[i].Map[p.TargetNameFrom].(string); ok && name != "" {
+					target[i].Name = name // set the name field to the value of targetNameFrom
+				}
+			}
+		}
+		targets = append(targets, target...)
 	}
 	p.Targets = targets
 	return nil
 }
 
-func (p *HelmProvider) CheckVersionOutOfDate(target helm.HelmChartTarget) (bool, string, string, error) {
+func (p *ArgoAppOfAppsProvider) GetTargets() ([]ProviderTarget, error) {
+	if len(p.Targets) == 0 {
+		if err := p.Load(); err != nil {
+			return nil, fmt.Errorf("failed to load targets: %w", err)
+		}
+	}
+
+	// Convert the targets to a slice of interfaces
+	targets := make([]ProviderTarget, len(p.Targets))
+	for i, target := range p.Targets {
+		targets[i] = target
+	}
+	return targets, nil
+}
+
+func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (bool, string, string, error) {
+
+	repoUrl, ok := target.Map["repoURL"].(string)
+	if !ok || repoUrl == "" {
+		return false, "", "", fmt.Errorf("failed to get repoURL from target: missing or not a string")
+	}
+	targetRevision, ok := target.Map["targetRevision"].(string)
+	if !ok || targetRevision == "" {
+		return false, "", "", fmt.Errorf("failed to get targetRevision from target: missing or not a string")
+	}
+	// chartName, ok := target.Map["chartName"].(string)
+	// if !ok || chartName == "" {
+	// 	return false, "", "", fmt.Errorf("failed to get chartName from target: missing or not a string")
+	// }
+
 	// pull repo data
-	entriesUrl, err := url.JoinPath(strings.TrimSpace(target.RepoURL), "index.yaml")
+	entriesUrl, err := url.JoinPath(strings.TrimSpace(repoUrl), "index.yaml")
 	if err != nil {
 		return false, "", "", fmt.Errorf("failed to join path: %w", err)
 	}
 
 	// Fetch the index.yaml file from the Helm repository
 	// this should cache the index.yaml file in the future
-	entriesYaml, err := p.getURLContent(strings.TrimSpace(target.RepoURL), "index.yaml")
+	entriesYaml, err := p.getURLContent(strings.TrimSpace(repoUrl), "index.yaml")
 	if err != nil {
 		return false, "", "", fmt.Errorf("failed to fetch index.yaml from %s: %w", entriesUrl, err)
 	}
@@ -175,23 +238,24 @@ func (p *HelmProvider) CheckVersionOutOfDate(target helm.HelmChartTarget) (bool,
 		logrus.Debugln(string(entriesYaml))
 		return false, "", "", fmt.Errorf("failed to parse expectedVersion '%s': %w", result, err)
 	}
-	currentVersion, err := version.NewVersion(target.TargetRevision)
+
+	currentVersion, err := version.NewVersion(targetRevision)
 	if err != nil {
-		return false, "", "", fmt.Errorf("failed to parse current version '%s': %w", target.TargetRevision, err)
+		return false, "", "", fmt.Errorf("failed to parse current version '%s': %w", targetRevision, err)
 	}
 	if currentVersion.LessThan(expectedVersion) {
-		logrus.Debugf("%s is out of date: current version %s, expected version %s", target.ChartName, currentVersion.String(), expectedVersion.String())
+		logrus.Debugf("%s is out of date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
 		return true, currentVersion.String(), expectedVersion.String(), nil
 	} else if currentVersion.Equal(expectedVersion) {
-		logrus.Debugf("%s is up to date: current version %s, expected version %s", target.ChartName, currentVersion.String(), expectedVersion.String())
+		logrus.Debugf("%s is up to date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
 		return false, currentVersion.String(), expectedVersion.String(), nil
 	} else {
-		logrus.Debugf("%s has a newer version: current version %s, expected version %s", target.ChartName, currentVersion.String(), expectedVersion.String())
+		logrus.Debugf("%s has a newer version: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
 		return false, currentVersion.String(), expectedVersion.String(), nil
 	}
 }
 
-func (p *HelmProvider) writeCachedContent(cacheKey []byte, content []byte) error {
+func (p *ArgoAppOfAppsProvider) writeCachedContent(cacheKey []byte, content []byte) error {
 	if !p.UseCache {
 		logrus.Debugf("Cache is disabled, not writing content for %x", cacheKey)
 		return nil // return nil to indicate that we are not caching
@@ -205,7 +269,7 @@ func (p *HelmProvider) writeCachedContent(cacheKey []byte, content []byte) error
 	return nil
 }
 
-func (p *HelmProvider) getCachedContent(cacheKey []byte, contentURL string) ([]byte, error) {
+func (p *ArgoAppOfAppsProvider) getCachedContent(cacheKey []byte, contentURL string) ([]byte, error) {
 	if !p.UseCache {
 		logrus.Debugf("Cache is disabled, fetching content from %s", contentURL)
 		return nil, nil // return nil to indicate that we need to fetch the content
@@ -236,7 +300,7 @@ func (p *HelmProvider) getCachedContent(cacheKey []byte, contentURL string) ([]b
 	return nil, nil // return nil to indicate that we need to fetch the content
 }
 
-func (p *HelmProvider) getURLContent(baseUrl string, pathSegments ...string) ([]byte, error) {
+func (p *ArgoAppOfAppsProvider) getURLContent(baseUrl string, pathSegments ...string) ([]byte, error) {
 	// Normalize the URL to ensure it matches the keys in the authentication map
 	normalizedBaseUrl, _ := url.Parse(baseUrl)
 	contentURL := normalizedBaseUrl.JoinPath(pathSegments...) // Join the base URL with the path segments
@@ -314,11 +378,11 @@ func (p *HelmProvider) getURLContent(baseUrl string, pathSegments ...string) ([]
 	return finalContent, nil
 }
 
-type HelmProviderAuthenticationTemplateData struct {
+type ArgoAppOfAppsProviderAuthenticationTemplateData struct {
 	EnvironmentVariables map[string]string
 }
 
-func (p *HelmProvider) envTemplateValue(template string) string {
+func (p *ArgoAppOfAppsProvider) envTemplateValue(template string) string {
 	// This function should implement the logic to render a template with environment variables
 	// create a map of environment variables from os.Environ
 	envVars := make(map[string]string)
@@ -330,7 +394,7 @@ func (p *HelmProvider) envTemplateValue(template string) string {
 			envVars[parts[0]] = parts[1]
 		}
 	}
-	result := templates.NewTemplate("templated-value", template, &HelmProviderAuthenticationTemplateData{
+	result := templates.NewTemplate("templated-value", template, &ArgoAppOfAppsProviderAuthenticationTemplateData{
 		EnvironmentVariables: envVars,
 	})
 	rendered, err := result.Render()

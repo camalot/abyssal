@@ -11,31 +11,41 @@ var CheckCmd = &cobra.Command{
 	Short: "Check for outdated packages",
 	Long:  `Check for outdated packages in your project.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Your command logic here
-		p := providers.NewHelmProvider(Config)
 
-		p.EntriesSelector = Config.Settings.Providers.Helm.EntriesSelector
-		p.Directory = "./sample"
-		p.Selector = " .cloudimanage.applications "
-		p.Evaluator = Config.Settings.Providers.Helm.EvaluatorSelector
-
-		if err := p.Load(); err != nil {
-			Logger.Fatalf("Error loading Helm provider: %v", err)
-		}
-		for _, target := range p.Targets {
-			// convert the targets in to Packages
-			outdated, current, expected, err := p.CheckVersionOutOfDate(target)
+		for _, provider := range Config.Providers {
+			p := providers.NewProvider(provider, Config)
+			if err := p.Load(); err != nil {
+				Logger.Fatalf("Error loading Argo provider: %v", err)
+			}
+			targets, err := p.GetTargets()
 			if err != nil {
-				Logger.Errorf("Error checking package %s: %v", target.ChartName, err)
-				continue
+				Logger.Fatalf("Error getting targets from provider: %v", err)
 			}
-			if outdated {
-				Logger.Warnf("%s is out of date! Current version: %s - Latest version: %s", target.ChartName, current, expected)
-			} else {
-				Logger.Infof("%s is up to date.", target.ChartName)
-			}
+			for _, target := range targets {
+				// convert the targets in to Packages
+				outdated, current, expected, err := p.CheckVersionOutOfDate(target)
+				if err != nil {
+					Logger.Errorf("Error checking package %s: %v", target.Name, err)
+					continue
+				}
+				if outdated {
+					Logger.Warnf("%s is out of date! Current version: %s - Latest version: %s", target.Name, current, expected)
+				} else {
+					Logger.Infof("%s is up to date.", target.Name)
+				}
 
+			}
 		}
+
+		// TODO: loop the providers and load them accordingly
+		// p := providers.NewArgoAppOfAppsProvider(Config)
+
+		// p.EntriesSelector = Config.Settings.Providers.ArgoAppOfApps.EntriesSelector
+		// p.Directory = "./sample"
+		// p.Selector = " .cloudimanage.applications "
+		// p.Evaluator = Config.Settings.Providers.ArgoAppOfApps.EvaluatorSelector
+
+
 	},
 }
 

@@ -21,7 +21,7 @@ spaces_around_brackets = false
 
 [{Makefile,go.mod,go.sum,*.go,.gitmodules}]
 indent_style = tab
-indent_size = 4
+indent_size = 2
 
 
 [*.py]
