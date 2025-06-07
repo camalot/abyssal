@@ -16,10 +16,10 @@ name: Build
         required: false
         type: boolean
         default: false
-    secrets:
-      GITHUB_TOKEN:
-        description: 'GitHub token to use for the action'
-        required: true
+    # secrets:
+    #   GITHUB_TOKEN:
+    #     description: 'GitHub token to use for the action'
+    #     required: true
 permissions: {}
 env:
   PROJECT_NAME: '${{ github.event.repository.name }}'

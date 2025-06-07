@@ -16,8 +16,8 @@ jobs:
       # To report GitHub Actions status checks
       statuses: write
     uses: ./.github/workflows/lint.yml
-    secrets:
-      GITHUB_TOKEN: ${{ github.token }}
+    # secrets:
+    #   GITHUB_TOKEN: ${{ github.token }}
 
   # call the version job to get the new version
   version:
@@ -34,8 +34,8 @@ jobs:
       prefix: 'v'
       strict: false
       create_milestone: true
-    secrets:
-      GITHUB_TOKEN: ${{ github.token }}
+    # secrets:
+    #   GITHUB_TOKEN: ${{ github.token }}
 
   # call the build job to build the project
   build:
@@ -51,5 +51,5 @@ jobs:
       version: ${{ needs.version.outputs.patch }}
       tag: ${{ needs.version.outputs.pfx_patch }}
       publish: true
-    secrets:
-      GITHUB_TOKEN: ${{ github.token }}
+    # secrets:
+    #   GITHUB_TOKEN: ${{ github.token }}
