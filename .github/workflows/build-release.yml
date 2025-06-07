@@ -15,7 +15,7 @@ jobs:
       packages: read
       # To report GitHub Actions status checks
       statuses: write
-    uses: ./.github/workflows/lint.yml
+    uses: ./.github/actions/lint.yml
     # secrets:
     #   GITHUB_TOKEN: ${{ github.token }}
 
@@ -28,7 +28,7 @@ jobs:
       packages: read
       # To report GitHub Actions status checks
       statuses: write
-    uses: ./.github/workflows/version.yml
+    uses: ./.github/actions/version.yml
     with:
       fallback: 'v0.0.0'
       prefix: 'v'
@@ -39,7 +39,7 @@ jobs:
 
   # call the build job to build the project
   build:
-    uses: ./.github/workflows/build.yml
+    uses: ./.github/actions/build.yml
     needs:
       - version
     permissions:
