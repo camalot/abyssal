@@ -55,7 +55,7 @@ jobs:
         run: |
           mkdir -p bin artifacts
           output="bin/${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}"
-          version="${{ needs.version.outputs.app_version }}"
+          version="${{ github.event.inputs.version }}"
           if [ "${{ matrix.os }}" = "windows" ]; then output="${output}.exe"; fi
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${version}" -o $output .
           cp .abyssal.yaml bin/.abyssal.yaml
@@ -86,11 +86,11 @@ jobs:
       - name: "Create Release Tag"
         uses: niccolo/release-action@v1
         with:
-          name: "${{ needs.version.outputs.tag }}"
+          name: "${{ github.event.inputs.tag }}"
           allowUpdates: true
           generateReleaseNotes: true
           removeArtifacts: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: "${{ needs.version.outputs.tag }}"
+          tag: "${{ github.event.inputs.tag }}"
           artifactContentType: "application/gzip"
           artifacts: "${{ env.PROJECT_NAME }}/release-artifacts/*.tar.gz"
