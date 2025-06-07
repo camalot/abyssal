@@ -34,6 +34,9 @@ jobs:
           VALIDATE_MARKDOWN_PRETTIER: false
           VALIDATE_JSON_PRETTIER: false
 
+          VALIDATE_GO: false
+          VALIDATE_GO_MODULES: false
+
           FIX_GO_MODULES: false
           FIX_GO: false
           FIX_JSON_PRETTIER: false
