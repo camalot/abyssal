@@ -84,7 +84,7 @@ jobs:
         run: |
           find ${{ env.PROJECT_NAME }}/release-artifacts -type f -name '*.tar.gz' -exec mv {} ${{ env.PROJECT_NAME }}/release-artifacts/ \;
       - name: "Create Release Tag"
-        uses: niccolo/release-action@v1
+        uses: ncipollo/release-action@v1
         with:
           name: "${{ inputs.tag }}"
           allowUpdates: true
