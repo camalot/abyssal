@@ -38,13 +38,13 @@ name: Get Version
         value: '${{ jobs.get_version.outputs.major }}'
       pfx_patch:
         description: 'The new calculated patch version with prefix - 1.2.3 -> v1.2.4'
-        value: '${{ github.event.inputs.prefix }}${{ jobs.get_version.outputs.patch }}'
+        value: '${{ inputs.prefix }}${{ jobs.get_version.outputs.patch }}'
       pfx_minor:
         description: 'The new calculated minor version with prefix - 1.2.3 -> v1.3.0'
-        value: '${{ github.event.inputs.prefix }}${{ jobs.get_version.outputs.minor }}'
+        value: '${{ inputs.prefix }}${{ jobs.get_version.outputs.minor }}'
       pfx_major:
         description: 'The new calculated major version with prefix - 1.2.3 -> v2.0.0'
-        value: '${{ github.event.inputs.prefix }}${{ jobs.get_version.outputs.major }}'
+        value: '${{ inputs.prefix }}${{ jobs.get_version.outputs.major }}'
       v_patch:
         description: 'The new calculated patch version with v prefix - 1.2.3 -> v1.2.4'
         value: '${{ jobs.get_version.outputs.v_patch }}'
@@ -67,9 +67,9 @@ jobs:
       patch: ${{ steps.semvers.outputs.patch }}
       minor: ${{ steps.semvers.outputs.minor }}
       major: ${{ steps.semvers.outputs.major }}
-      pfx_patch: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}
-      pfx_minor: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}
-      pfx_major: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}
+      pfx_patch: ${{ inputs.prefix }}${{ steps.semvers.outputs.patch }}
+      pfx_minor: ${{ inputs.prefix }}${{ steps.semvers.outputs.minor }}
+      pfx_major: ${{ inputs.prefix }}${{ steps.semvers.outputs.major }}
       v_patch: ${{ steps.semvers.outputs.patch }}
       v_minor: ${{ steps.semvers.outputs.minor }}
       v_major: ${{ steps.semvers.outputs.major }}
@@ -81,7 +81,7 @@ jobs:
         id: previoustag
         uses: "WyriHaximus/github-action-get-previous-tag@v1"
         with:
-          prefix: ${{ github.event.inputs.prefix }} # Optional prefix to strip from the tag
+          prefix: ${{ inputs.prefix }} # Optional prefix to strip from the tag
           fallback: 0.1.0 # Optional fallback tag to use when no tag can be found
       # calculate the next version
       - name: 'Get next minor version'
@@ -89,14 +89,14 @@ jobs:
         uses: "WyriHaximus/github-action-next-semvers@v1"
         with:
           version: ${{ steps.previoustag.outputs.tag }}
-          strict: ${{ github.event.inputs.strict }} # Optional strict version validation, when turned off, the version is suffixed with .0 until it contains 3 x `.` (default: false)
+          strict: ${{ inputs.strict }} # Optional strict version validation, when turned off, the version is suffixed with .0 until it contains 3 x `.` (default: false)
       - run: |
           echo "Patch: ${{ steps.semvers.outputs.patch }}"
           echo "Minor: ${{ steps.semvers.outputs.minor }}"
           echo "Major: ${{ steps.semvers.outputs.major }}"
-          echo "Prefixed Patch: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}"
-          echo "Prefixed Minor: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}"
-          echo "Prefixed Major: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}"
+          echo "Prefixed Patch: ${{ inputs.prefix }}${{ steps.semvers.outputs.patch }}"
+          echo "Prefixed Minor: ${{ inputs.prefix }}${{ steps.semvers.outputs.minor }}"
+          echo "Prefixed Major: ${{ inputs.prefix }}${{ steps.semvers.outputs.major }}"
           echo "vPatch: v${{ steps.semvers.outputs.patch }}"
           echo "vMinor: v${{ steps.semvers.outputs.minor }}"
           echo "vMajor: v${{ steps.semvers.outputs.major }}"
@@ -104,9 +104,9 @@ jobs:
             echo "patch=${{ steps.semvers.outputs.patch }}"
             echo "minor=${{ steps.semvers.outputs.minor }}"
             echo "major=${{ steps.semvers.outputs.major }}"
-            echo "pfx_patch=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}"
-            echo "pfx_minor=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}"
-            echo "pfx_major=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}"
+            echo "pfx_patch=${{ inputs.prefix }}${{ steps.semvers.outputs.patch }}"
+            echo "pfx_minor=${{ inputs.prefix }}${{ steps.semvers.outputs.minor }}"
+            echo "pfx_major=${{ inputs.prefix }}${{ steps.semvers.outputs.major }}"
             echo "v_patch=v${{ steps.semvers.outputs.patch }}"
             echo "v_minor=v${{ steps.semvers.outputs.minor }}"
             echo "v_major=v${{ steps.semvers.outputs.major }}"
