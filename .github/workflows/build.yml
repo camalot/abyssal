@@ -49,9 +49,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23.3'
-          cache-dependency-path: ./${{ env.PROJECT_NAME }}/go.sum
+          cache-dependency-path: ./go.sum
       - name: Build
-        working-directory: ./${{ env.PROJECT_NAME }}
+        working-directory: .
         run: |
           mkdir -p bin artifacts
           output="bin/${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}"
