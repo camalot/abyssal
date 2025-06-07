@@ -67,6 +67,11 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
     needs:
       - build
     if: inputs.publish == true
