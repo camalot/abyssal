@@ -1,11 +1,29 @@
 {
   "cSpell.words": [
+    "camalot",
     "Debugf",
     "Debugln",
+    "dupl",
+    "errcheck",
+    "gitmodules",
+    "goconst",
+    "gocritic",
+    "gocyclo",
     "godotenv",
+    "goimports",
+    "gosec",
+    "govet",
+    "Haximus",
     "Infof",
     "joho",
     "logrus",
-    "Warnf"
+    "mikefarah",
+    "Prefs",
+    "previoustag",
+    "semvers",
+    "sirupsen",
+    "unconvert",
+    "Warnf",
+    "yqlib"
   ]
 }

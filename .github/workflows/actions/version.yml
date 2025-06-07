@@ -1,0 +1,89 @@
+---
+name: Get Version
+"on":
+  workflow_dispatch:
+    input:
+      fallback:
+        description: 'Fallback tag to use when no tag can be found'
+        required: true
+        type: string
+      prefix:
+        description: 'The prefix to use for the tag'
+        required: false
+        type: string
+        default: 'v'
+      strict:
+        description: 'Strict version validation, when turned off, the version is suffixed with .0 until it contains 3 x `.`'
+        required: false
+        type: boolean
+        default: false
+      create_milestone:
+        description: 'Create a milestone with the new version'
+        required: false
+        type: boolean
+        default: false
+    output:
+      patch:
+        description: 'The new calculated patch version - 1.2.3 -> 1.2.4'
+        value: '${{ steps.semvers.outputs.patch }}'
+      minor:
+        description: 'The new calculated minor version - 1.2.3 -> 1.3.0'
+        value: '${{ steps.semvers.outputs.minor }}'
+      major:
+        description: 'The new calculated major version - 1.2.3 -> 2.0.0'
+        value: '${{ steps.semvers.outputs.major }}'
+      pfx_patch:
+        description: 'The new calculated patch version with prefix - 1.2.3 -> v1.2.4'
+        value: '${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}'
+      pfx_minor:
+        description: 'The new calculated minor version with prefix - 1.2.3 -> v1.3.0'
+        value: '${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}'
+      pfx_major:
+        description: 'The new calculated major version with prefix - 1.2.3 -> v2.0.0'
+        value: '${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}'
+      v_patch:
+        description: 'The new calculated patch version with v prefix - 1.2.3 -> v1.2.4'
+        value: '${{ steps.semvers.outputs.v_patch }}'
+      v_minor:
+        description: 'The new calculated minor version with v prefix - 1.2.3 -> v1.3.0'
+        value: '${{ steps.semvers.outputs.v_minor }}'
+      v_major:
+        description: 'The new calculated major version with v prefix - 1.2.3 -> v2.0.0'
+        value: '${{ steps.semvers.outputs.v_major }}'
+permissions: {}
+jobs:
+  get_version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 'Get Previous tag'
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          prefix: ${{ github.event.inputs.prefix }} # Optional prefix to strip from the tag
+          fallback: 0.1.0 # Optional fallback tag to use when no tag can be found
+      # calculate the next version
+      - name: 'Get next minor version'
+        id: semvers
+        uses: "WyriHaximus/github-action-next-semvers@v1"
+        with:
+          version: ${{ steps.previoustag.outputs.tag }}
+          strict: ${{ github.event.inputs.strict }} # Optional strict version validation, when turned off, the version is suffixed with .0 until it contains 3 x `.` (default: false)
+      - run: |
+          echo "Patch: ${{ steps.semvers.outputs.patch }}"
+          echo "Minor: ${{ steps.semvers.outputs.minor }}"
+          echo "Major: ${{ steps.semvers.outputs.major }}"
+          echo "Prefixed Patch: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}"
+          echo "Prefixed Minor: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}"
+          echo "Prefixed Major: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}"
+          echo "vPatch: v${{ steps.semvers.outputs.patch }}"
+          echo "vMinor: v${{ steps.semvers.outputs.minor }}"
+          echo "vMajor: v${{ steps.semvers.outputs.major }}"
+        shell: bash

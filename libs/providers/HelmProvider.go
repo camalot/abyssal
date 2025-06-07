@@ -19,7 +19,6 @@ import (
 	"gopkg.in/op/go-logging.v1"
 	"gopkg.in/yaml.v3"
 
-	// "gopkg.in/yaml.v3"
 	yq "github.com/mikefarah/yq/v4/pkg/yqlib"
 )
 
@@ -126,9 +125,6 @@ func (p *HelmProvider) Load() error {
 }
 
 func (p *HelmProvider) CheckVersionOutOfDate(target helm.HelmChartTarget) (bool, string, string, error) {
-	// This function should implement the logic to check if the version is out of date
-	// For now, we will just return false, empty strings and nil error
-	// You can implement the actual logic based on your requirements
 	// pull repo data
 	entriesUrl, err := url.JoinPath(strings.TrimSpace(target.RepoURL), "index.yaml")
 	if err != nil {
@@ -288,7 +284,7 @@ func (p *HelmProvider) getURLContent(baseUrl string, pathSegments ...string) ([]
 			case "bearer":
 				token := p.envTemplateValue(auth.Token)
 				if token == "" {
-					return nil, fmt.Errorf("Bearer token is empty for %s", normalizedBaseUrl.String())
+					return nil, fmt.Errorf("bearer token is empty for %s", normalizedBaseUrl.String())
 				}
 				client = &http.Client{
 					Transport: &authTransport{

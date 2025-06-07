@@ -1,0 +1,55 @@
+---
+name: Build and Release
+"on":
+  workflow_dispatch: {}
+
+permissions: {}
+env:
+  PROJECT_NAME: '${{ github.event.repository.name }}'
+  ORGANIZATION: '${{ github.event.repository.owner }}'
+jobs:
+  # call the lint job to lint the code
+  lint:
+    permissions:
+      contents: read
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
+    uses: ./.github/workflows/actions/lint.yml
+    secrets:
+      GITHUB_TOKEN: ${{ github.token }}
+
+  # call the version job to get the new version
+  version:
+    needs:
+      - lint
+    permissions:
+      contents: read
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
+    uses: ./.github/workflows/actions/version.yml
+    with:
+      fallback: 'v0.0.0'
+      prefix: 'v'
+      strict: false
+      create_milestone: true
+    secrets:
+      GITHUB_TOKEN: ${{ github.token }}
+
+  # call the build job to build the project
+  build:
+    uses: ./.github/workflows/actions/build.yml
+    needs:
+      - version
+    permissions:
+      contents: read
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
+    with:
+      version: ${{ needs.version.outputs.patch }}
+      tag: ${{ needs.version.outputs.pfx_patch }}
+      publish: true
+    secrets:
+      GITHUB_TOKEN: ${{ github.token }}

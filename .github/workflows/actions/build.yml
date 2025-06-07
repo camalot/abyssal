@@ -1,0 +1,92 @@
+---
+name: Build
+"on":
+  workflow_dispatch:
+    input:
+      version:
+        description: 'Version to build'
+        required: true
+        type: string
+      tag:
+        description: 'Tag to use for the release'
+        required: true
+        type: string
+      publish:
+        description: 'Publish the release'
+        required: false
+        type: boolean
+        default: false
+permissions: {}
+env:
+  PROJECT_NAME: '${{ github.event.repository.name }}'
+  ORGANIZATION: '${{ github.event.repository.owner }}'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
+    strategy:
+      matrix:
+        os:
+          - linux
+          - windows
+          - darwin
+        arch:
+          - amd64
+          - arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.3'
+          cache-dependency-path: ./${{ env.PROJECT_NAME }}/go.sum
+      - name: Build
+        working-directory: ./${{ env.PROJECT_NAME }}
+        run: |
+          mkdir -p bin artifacts
+          output="bin/${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}"
+          version="${{ needs.version.outputs.app_version }}"
+          if [ "${{ matrix.os }}" = "windows" ]; then output="${output}.exe"; fi
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${version}" -o $output .
+          cp .abyssal.yaml bin/.abyssal.yaml
+          tar -czf ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz -C bin ./
+          mv ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz artifacts/
+          echo "BUILD_ARTIFACT=${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" >> $GITHUB_ENV
+          rm -rf ./bin
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: artifacts/
+
+    publish:
+      runs-on: ubuntu-latest
+      needs:
+        - build
+      if: github.event.inputs.publish == true
+      steps:
+        - name: Download build artifacts
+          uses: actions/download-artifact@v4
+          with:
+            pattern: ${{ env.PROJECT_NAME }}-artifacts-*
+            path: ${{ env.PROJECT_NAME }}/release-artifacts
+        - name: Move all tarballs to release-artifacts root
+          run: |
+            find ${{ env.PROJECT_NAME }}/release-artifacts -type f -name '*.tar.gz' -exec mv {} ${{ env.PROJECT_NAME }}/release-artifacts/ \;
+        - name: "Create Release Tag"
+          uses: niccolo/release-action@v1
+          with:
+            name: "${{ needs.version.outputs.tag }}"
+            allowUpdates: true
+            generateReleaseNotes: true
+            removeArtifacts: true
+            token: ${{ secrets.GITHUB_TOKEN }}
+            tag: "${{ needs.version.outputs.tag }}"
+            artifactContentType: "application/gzip"
+            artifacts: "${{ env.PROJECT_NAME }}/release-artifacts/*.tar.gz"

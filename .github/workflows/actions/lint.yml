@@ -1,0 +1,37 @@
+---
+name: Lint
+"on":
+  workflow_dispatch: {}
+permissions: {}
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      # To report GitHub Actions status checks
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Super-linter
+        uses: super-linter/super-linter@v7
+        env:
+          # To report GitHub Actions status checks
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          VALIDATE_ALL_CODEBASE: true
+          VALIDATE_CHECKOV: false
+          VALIDATE_EDITORCONFIG: true
+
+          VALIDATE_YAML_PRETTIER: false
+          VALIDATE_MARKDOWN_PRETTIER: false
+          VALIDATE_JSON_PRETTIER: false
+
+          FIX_GO_MODULES: false
+          FIX_GO: false
+          FIX_JSON_PRETTIER: false
+          FIX_MARKDOWN_PRETTIER: false
+          FIX_YAML_PRETTIER: false
