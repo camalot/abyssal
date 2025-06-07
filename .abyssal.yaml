@@ -19,14 +19,42 @@ settings:
       body: |
         Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
       token: "{{ .EnvironmentVariables.GITHUB_TOKEN }}"
+      labels: ["abyssal"]
     slack:
       enabled: false
+      webhook: "{{ .EnvironmentVariables.SLACK_WEBHOOK }}"
+      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      body: |
+        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+      username: "Abyssal"
+      iconEmoji: ":robot_face:"
+      channel: "#abyssal-notifications"
     discord:
       enabled: false
+      webhook: "{{ .EnvironmentVariables.DISCORD_WEBHOOK }}"
+      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      body: |
+        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+      username: "Abyssal"
+      avatarURL: "https://avatars.githubusercontent.com/u/123456789?v=4"
     email:
       enabled: false
+      smtpHost: "{{ .EnvironmentVariables.SMTP_HOST }}"
+      smtpPort: "{{ .EnvironmentVariables.SMTP_PORT }}"
+      smtpUser: "{{ .EnvironmentVariables.SMTP_USER }}"
+      smtpPassword: "{{ .EnvironmentVariables.SMTP_PASSWORD }}"
+      from: "{{ .EnvironmentVariables.SMTP_FROM }}"
     jira:
       enabled: false
+      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      body: |
+        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+      user: "{{ .EnvironmentVariables.JIRA_USER }}"
+      token: "{{ .EnvironmentVariables.JIRA_TOKEN }}"
+      url: "{{ .EnvironmentVariables.JIRA_URL }}"
+      project: "{{ .EnvironmentVariables.JIRA_PROJECT }}"
+      issueType: "{{ .EnvironmentVariables.JIRA_ISSUE_TYPE }}"
+      labels: ["abyssal"]
   
 
 providers:
