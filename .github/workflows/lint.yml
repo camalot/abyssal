@@ -1,11 +1,7 @@
 ---
-name: Lint
+name: Super Lint
 "on":
   workflow_call: {}
-    # secrets:
-    #   GITHUB_TOKEN:
-    #     description: 'GitHub token to use for the action'
-    #     required: true
 permissions: {}
 jobs:
   lint:

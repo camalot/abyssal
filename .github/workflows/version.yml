@@ -22,10 +22,6 @@ name: Get Version
         required: false
         type: boolean
         default: false
-    # secrets:
-    #   GITHUB_TOKEN:
-    #     description: 'GitHub token to use for the action'
-    #     required: true
     outputs:
       patch:
         description: 'The new calculated patch version - 1.2.3 -> 1.2.4'

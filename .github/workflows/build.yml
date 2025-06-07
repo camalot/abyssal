@@ -16,10 +16,6 @@ name: Build
         required: false
         type: boolean
         default: false
-    # secrets:
-    #   GITHUB_TOKEN:
-    #     description: 'GitHub token to use for the action'
-    #     required: true
 permissions: {}
 env:
   PROJECT_NAME: '${{ github.event.repository.name }}'
@@ -79,10 +75,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: ${{ env.PROJECT_NAME }}-artifacts-*
-          path: ${{ env.PROJECT_NAME }}/release-artifacts
+          path: release-artifacts
       - name: Move all tarballs to release-artifacts root
         run: |
-          find ${{ env.PROJECT_NAME }}/release-artifacts -type f -name '*.tar.gz' -exec mv {} ${{ env.PROJECT_NAME }}/release-artifacts/ \;
+          find release-artifacts -type f -name '*.tar.gz' -exec mv {} release-artifacts/ \;
       - name: "Create Release Tag"
         uses: ncipollo/release-action@v1
         with:
@@ -93,4 +89,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: "${{ inputs.tag }}"
           artifactContentType: "application/gzip"
-          artifacts: "${{ env.PROJECT_NAME }}/release-artifacts/*.tar.gz"
+          artifacts: "release-artifacts/*.tar.gz"
