@@ -63,6 +63,16 @@ jobs:
       packages: read
       # To report GitHub Actions status checks
       statuses: write
+    outputs:
+      patch: ${{ steps.semvers.outputs.patch }}
+      minor: ${{ steps.semvers.outputs.minor }}
+      major: ${{ steps.semvers.outputs.major }}
+      pfx_patch: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}
+      pfx_minor: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}
+      pfx_major: ${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}
+      v_patch: ${{ steps.semvers.outputs.patch }}
+      v_minor: ${{ steps.semvers.outputs.minor }}
+      v_major: ${{ steps.semvers.outputs.major }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,15 +100,15 @@ jobs:
           echo "vPatch: v${{ steps.semvers.outputs.patch }}"
           echo "vMinor: v${{ steps.semvers.outputs.minor }}"
           echo "vMajor: v${{ steps.semvers.outputs.major }}"
-          
-          echo "patch=${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
-          echo "minor=${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
-          echo "major=${{ steps.semvers.outputs.major }}" >> $GITHUB_OUTPUT
-          echo "pfx_patch=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
-          echo "pfx_minor=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
-          echo "pfx_major=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}" >> $GITHUB_OUTPUT
-          echo "v_patch=v${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
-          echo "v_minor=v${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
-          echo "v_major=v${{ steps.semvers.outputs.major }}" >> $GITHUB_OUTPUT
+
+          echo "patch=${{ steps.semvers.outputs.patch }}" >> "$GITHUB_OUTPUT"
+          echo "minor=${{ steps.semvers.outputs.minor }}" >> "$GITHUB_OUTPUT"
+          echo "major=${{ steps.semvers.outputs.major }}" >> "$GITHUB_OUTPUT"
+          echo "pfx_patch=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.patch }}" >> "$GITHUB_OUTPUT"
+          echo "pfx_minor=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.minor }}" >> "$GITHUB_OUTPUT"
+          echo "pfx_major=${{ github.event.inputs.prefix }}${{ steps.semvers.outputs.major }}" >> "$GITHUB_OUTPUT"
+          echo "v_patch=v${{ steps.semvers.outputs.patch }}" >> "$GITHUB_OUTPUT"
+          echo "v_minor=v${{ steps.semvers.outputs.minor }}" >> "$GITHUB_OUTPUT"
+          echo "v_major=v${{ steps.semvers.outputs.major }}" >> "$GITHUB_OUTPUT"
 
         shell: bash

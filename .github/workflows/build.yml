@@ -57,11 +57,11 @@ jobs:
           output="bin/${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}"
           version="${{ github.event.inputs.version }}"
           if [ "${{ matrix.os }}" = "windows" ]; then output="${output}.exe"; fi
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${version}" -o $output .
+          GOOS="${{ matrix.os }}" GOARCH="${{ matrix.arch }}" go build -ldflags "-X main.version=${version}" -o "$output" .
           cp .abyssal.yaml bin/.abyssal.yaml
-          tar -czf ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz -C bin ./
-          mv ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz artifacts/
-          echo "BUILD_ARTIFACT=${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" >> $GITHUB_ENV
+          tar -czf "${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" -C bin ./
+          mv "${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" artifacts/
+          echo "BUILD_ARTIFACT=${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" >> "$GITHUB_ENV"
           rm -rf ./bin
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

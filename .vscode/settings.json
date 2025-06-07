@@ -6,6 +6,7 @@
     "dupl",
     "errcheck",
     "gitmodules",
+    "GOARCH",
     "goconst",
     "gocritic",
     "gocyclo",
