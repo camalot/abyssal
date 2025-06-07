@@ -1,8 +1,8 @@
 ---
 name: Build
 "on":
-  workflow_dispatch:
-    input:
+  workflow_call:
+    inputs:
       version:
         description: 'Version to build'
         required: true
@@ -16,6 +16,10 @@ name: Build
         required: false
         type: boolean
         default: false
+    secrets:
+      GITHUB_TOKEN:
+        description: 'GitHub token to use for the action'
+        required: true
 permissions: {}
 env:
   PROJECT_NAME: '${{ github.event.repository.name }}'
@@ -65,28 +69,28 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: artifacts/
 
-    publish:
-      runs-on: ubuntu-latest
-      needs:
-        - build
-      if: github.event.inputs.publish == true
-      steps:
-        - name: Download build artifacts
-          uses: actions/download-artifact@v4
-          with:
-            pattern: ${{ env.PROJECT_NAME }}-artifacts-*
-            path: ${{ env.PROJECT_NAME }}/release-artifacts
-        - name: Move all tarballs to release-artifacts root
-          run: |
-            find ${{ env.PROJECT_NAME }}/release-artifacts -type f -name '*.tar.gz' -exec mv {} ${{ env.PROJECT_NAME }}/release-artifacts/ \;
-        - name: "Create Release Tag"
-          uses: niccolo/release-action@v1
-          with:
-            name: "${{ needs.version.outputs.tag }}"
-            allowUpdates: true
-            generateReleaseNotes: true
-            removeArtifacts: true
-            token: ${{ secrets.GITHUB_TOKEN }}
-            tag: "${{ needs.version.outputs.tag }}"
-            artifactContentType: "application/gzip"
-            artifacts: "${{ env.PROJECT_NAME }}/release-artifacts/*.tar.gz"
+  publish:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    if: github.event.inputs.publish == true
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.PROJECT_NAME }}-artifacts-*
+          path: ${{ env.PROJECT_NAME }}/release-artifacts
+      - name: Move all tarballs to release-artifacts root
+        run: |
+          find ${{ env.PROJECT_NAME }}/release-artifacts -type f -name '*.tar.gz' -exec mv {} ${{ env.PROJECT_NAME }}/release-artifacts/ \;
+      - name: "Create Release Tag"
+        uses: niccolo/release-action@v1
+        with:
+          name: "${{ needs.version.outputs.tag }}"
+          allowUpdates: true
+          generateReleaseNotes: true
+          removeArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "${{ needs.version.outputs.tag }}"
+          artifactContentType: "application/gzip"
+          artifacts: "${{ env.PROJECT_NAME }}/release-artifacts/*.tar.gz"

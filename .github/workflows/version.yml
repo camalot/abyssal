@@ -1,8 +1,8 @@
 ---
 name: Get Version
 "on":
-  workflow_dispatch:
-    input:
+  workflow_call:
+    inputs:
       fallback:
         description: 'Fallback tag to use when no tag can be found'
         required: true
@@ -22,7 +22,11 @@ name: Get Version
         required: false
         type: boolean
         default: false
-    output:
+    secrets:
+      GITHUB_TOKEN:
+        description: 'GitHub token to use for the action'
+        required: true
+    outputs:
       patch:
         description: 'The new calculated patch version - 1.2.3 -> 1.2.4'
         value: '${{ steps.semvers.outputs.patch }}'
