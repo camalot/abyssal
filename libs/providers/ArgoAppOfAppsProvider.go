@@ -149,6 +149,7 @@ func (p *ArgoAppOfAppsProvider) Load() error {
 			if p.TargetNameFrom != "" {
 				if name, ok := target[i].Map[p.TargetNameFrom].(string); ok && name != "" {
 					target[i].Name = name // set the name field to the value of targetNameFrom
+					target[i].Source = file // set the source field to the file path
 				}
 			}
 		}
@@ -253,6 +254,29 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (bo
 		logrus.Debugf("%s has a newer version: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
 		return false, currentVersion.String(), expectedVersion.String(), nil
 	}
+}
+
+func (p *ArgoAppOfAppsProvider) GetName() string {
+	return "Argo - App Of Apps"
+}
+
+func (p *ArgoAppOfAppsProvider) GetMarkdownTableHeader() string {
+	return "| Package | Source | Repository | Current Version | Expected Version | Status |\n" +
+		"|---------|--------|------------|-----------------|------------------|--------|\n"
+}
+
+func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(target ProviderTarget, outdated bool, currentVersion string, expectedVersion string) string {
+	status := "✅"
+	if outdated {
+		status = "❌"
+	}
+	return fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
+		target.Name,
+		target.Source,
+		target.Map["repoURL"],
+		currentVersion,
+		expectedVersion,
+		status)
 }
 
 func (p *ArgoAppOfAppsProvider) writeCachedContent(cacheKey []byte, content []byte) error {

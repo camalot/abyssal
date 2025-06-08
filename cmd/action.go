@@ -20,10 +20,13 @@ var ActionCmd = &cobra.Command{
 		fmt.Printf("# Abyssal - Results\n\n")
 
 		for _, provider := range Config.Providers {
+
 			p := providers.NewProvider(provider, Config)
 			if err := p.Load(); err != nil {
 				Logger.Fatalf("Error loading Argo provider: %v", err)
 			}
+			fmt.Printf("## Provider: %s\n\n", p.GetName())
+
 			targets, err := p.GetTargets()
 			if err != nil {
 				Logger.Fatalf("Error getting targets from provider: %v", err)
@@ -33,23 +36,18 @@ var ActionCmd = &cobra.Command{
 				continue
 			}
 
-			fmt.Printf("| Package | Current Version | Expected Version | Status |\n")
-			fmt.Printf("|---------|-----------------|------------------|--------|\n")
+			fmt.Print(p.GetMarkdownTableHeader())
 
 			for _, target := range targets {
 				// convert the targets in to Packages
 				outdated, current, expected, err := p.CheckVersionOutOfDate(target)
 				if err != nil {
-					fmt.Printf("| %s | Error checking package: %v |\n", target.Name, err)
+					fmt.Print(p.GetMarkdownTableRow(target, false, "", fmt.Sprintf("Error checking package: %v", err)))
 					// write to stderr
 					Logger.Errorf("Error checking package %s: %v", target.Name, err)
 					continue
 				}
-				if outdated {
-					fmt.Printf("| %s | %s | %s | ❌ |\n", target.Name, current, expected)
-				} else {
-					fmt.Printf("| %s | %s | %s | ✅ |\n", target.Name, current, expected)
-				}
+				fmt.Print(p.GetMarkdownTableRow(target, outdated, current, expected))
 			}
 		}
 
