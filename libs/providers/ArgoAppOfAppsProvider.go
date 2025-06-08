@@ -353,7 +353,7 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableHeader() string {
 	return `<table>
 	<thead>
 		<tr>
-			<th>Package</th>
+			<th>Chart Name</th>
 			<th>Source</th>
 			<th>Repository</th>
 			<th>Current Version</th>
@@ -378,26 +378,27 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableFooter() string {
 }
 
 func (p *ArgoAppOfAppsProvider) GetMarkdownLegend() string {
-	return `### Status Legend
+	return fmt.Sprintf(`---
 
-- ✅ Up to date
-- ❌ Outdated
-- ⚠️ Error
-- ⏭️ Skipped
-`
+### Status Legend
+
+- %s Up to date
+- %s Outdated
+- %s Error
+- %s Skipped`, ProviderCheckStateEmojiSuccess, ProviderCheckStateEmojiFailure, ProviderCheckStateEmojiError, ProviderCheckStateEmojiSkipped)
 }
 
 func (p *ArgoAppOfAppsProvider) getStatusIcon(result ProviderCheckResult) string {
 	if result.State == ProviderCheckStateError {
-		return "⚠️"
+		return string(ProviderCheckStateEmojiError) // Error state
 	} else if result.State == ProviderCheckStateSkipped {
-		return "⏭️"
+		return string(ProviderCheckStateEmojiSkipped) // Skipped state
 	} else if result.State == ProviderCheckStateSuccess && !result.Outdated {
-		return "✅"
+		return string(ProviderCheckStateEmojiSuccess) // Up to date state
 	} else if result.State == ProviderCheckStateSuccess && result.Outdated {
-		return "❌"
+		return string(ProviderCheckStateEmojiFailure) // Outdated state
 	} else {
-		return "❓" // Unknown state
+		return string(ProviderCheckStateEmojiUnknown) // Unknown state
 	}
 }
 
@@ -420,16 +421,9 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(result ProviderCheckResult) 
 		result.ExpectedVersion,
 		status,
 	)
-	// row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
-	// 	result.Target.Name,
-	// 	result.Target.Source,
-	// 	result.Target.Map["repoURL"],
-	// 	result.CurrentVersion,
-	// 	result.ExpectedVersion,
-	// 	status)
+
 	rows.WriteString(row)
 	if result.Error != "" {
-		// errorRow := fmt.Sprintf("| Error: %s |\n", result.Error)
 		errorRow := fmt.Sprintf(`
 		<tr>
 			<td colspan="6" style="color: red;">%s %s</td>

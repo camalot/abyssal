@@ -59,7 +59,6 @@ var ActionCmd = &cobra.Command{
 			}
 			fmt.Printf("%s\n\n", p.GetMarkdownTableFooter())
 			fmt.Printf("%s\n\n", p.GetMarkdownLegend())
-			fmt.Printf("---\n\n")
 		}
 
 		duration := time.Since(start)

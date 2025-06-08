@@ -1,21 +1,30 @@
 package providers
 
-
 type ProviderCheckResult struct {
-	Outdated bool   `json:"outdated" yaml:"outdated"`
-	Target ProviderTarget `json:"target" yaml:"target"`
-	CurrentVersion string `json:"current_version" yaml:"current_version"`
-	ExpectedVersion string `json:"expected_version" yaml:"expected_version"`
-	Error string `json:"error,omitempty" yaml:"error,omitempty"`
-	State ProviderState `json:"state" yaml:"state"`
+	Outdated        bool           `json:"outdated" yaml:"outdated"`
+	Target          ProviderTarget `json:"target" yaml:"target"`
+	CurrentVersion  string         `json:"current_version" yaml:"current_version"`
+	ExpectedVersion string         `json:"expected_version" yaml:"expected_version"`
+	Error           string         `json:"error,omitempty" yaml:"error,omitempty"`
+	State           ProviderState  `json:"state" yaml:"state"`
 }
 
 type ProviderState string
 
 const (
-	ProviderCheckStateSuccess   ProviderState = "success"
-	ProviderCheckStateSkipped   ProviderState = "skipped"
-	ProviderCheckStateError     ProviderState = "error"
+	ProviderCheckStateSuccess ProviderState = "success"
+	ProviderCheckStateSkipped ProviderState = "skipped"
+	ProviderCheckStateError   ProviderState = "error"
+)
+
+type ProviderStateEmoji string
+
+const (
+	ProviderCheckStateEmojiSuccess ProviderStateEmoji = "✅"
+	ProviderCheckStateEmojiSkipped ProviderStateEmoji = "⏭️"
+	ProviderCheckStateEmojiFailure ProviderStateEmoji = "❌"
+	ProviderCheckStateEmojiError   ProviderStateEmoji = "⚠️"
+	ProviderCheckStateEmojiUnknown ProviderStateEmoji = "❓"
 )
 
 type Provider interface {
@@ -31,7 +40,7 @@ type Provider interface {
 }
 
 type ProviderTarget struct {
-	Name string `yaml:"name"`
-	Source string `yaml:"-"`
-	Map  map[string]interface{} `yaml:",inline"`
+	Name   string                 `yaml:"name"`
+	Source string                 `yaml:"-"`
+	Map    map[string]interface{} `yaml:",inline"`
 }

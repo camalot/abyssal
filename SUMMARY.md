@@ -5,7 +5,7 @@
 <table>
         <thead>
                 <tr>
-                        <th>Package</th>
+                        <th>Chart Name</th>
                         <th>Source</th>
                         <th>Repository</th>
                         <th>Current Version</th>
@@ -168,8 +168,29 @@
                         <td>73.2.0</td>
                         <td>73.2.0</td>
                         <td>✅</td>
+                </tr>
+                <tr>
+                        <td>fluent-bit</td>
+                        <td>sample/values.yaml</td>
+                        <td>https://fluent.github.io/helm-charts</td>
+                        <td>57.71.98</td>
+                        <td>0.49.1</td>
+                        <td>⚠️</td>
+                </tr>
+                <tr>
+                        <td colspan="6" style="color: red;">⚠️ fluent-bit has a newer version: current version 57.71.98, expected version 0.49.1<</td>
+                </tr>
+                <tr>
+                        <td>cost-analyzer</td>
+                        <td>sample/values.yaml</td>
+                        <td>https://kubecost.github.io/cost-analyzer/</td>
+                        <td>2.8.0-rc.4</td>
+                        <td>2.8.0-rc.4</td>
+                        <td>✅</td>
                 </tr></tbody>
 </table>
+
+---
 
 ### Status Legend
 
@@ -180,6 +201,4 @@
 
 ---
 
----
-
-Execution Duration: 2.270471s
+Execution Duration: 2.1716151s
