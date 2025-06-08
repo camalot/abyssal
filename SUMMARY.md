@@ -79,7 +79,15 @@
                         <td>❌</td>
                 </tr>
                 <tr>
-                        <td>nginx-ingress</td>
+                        <td>ingress-nginx</td>
+                        <td>sample/values.yaml</td>
+                        <td>https://kubernetes.github.io/ingress-nginx</td>
+                        <td>4.5.2</td>
+                        <td>4.12.3</td>
+                        <td>❌</td>
+                </tr>
+                <tr>
+                        <td>bad-named-chart</td>
                         <td>sample/values.yaml</td>
                         <td>https://kubernetes.github.io/ingress-nginx</td>
                         <td></td>
@@ -157,16 +165,8 @@
                         <td>kube-prometheus-stack</td>
                         <td>sample/values.yaml</td>
                         <td>https://prometheus-community.github.io/helm-charts</td>
-                        <td>45.27.2</td>
                         <td>73.2.0</td>
-                        <td>❌</td>
-                </tr>
-                <tr>
-                        <td>prom-stack-grafana-extension</td>
-                        <td>sample/values.yaml</td>
-                        <td>https://artifactory.imanage.com/artifactory/helm</td>
-                        <td>0.1.23</td>
-                        <td>0.1.23</td>
+                        <td>73.2.0</td>
                         <td>✅</td>
                 </tr></tbody>
 </table>
@@ -178,9 +178,8 @@
 - ⚠️ Error
 - ⏭️ Skipped
 
-
 ---
 
 ---
 
-Execution Duration: 6.0700054s
+Execution Duration: 2.270471s
