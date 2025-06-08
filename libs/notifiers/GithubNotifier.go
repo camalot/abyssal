@@ -2,7 +2,7 @@ package notifiers
 
 import (
 	"context"
-	// "fmt"
+	"fmt"
 	"os"
 	"strings"
 
@@ -66,9 +66,9 @@ type GithubNotificationPayload struct {
 }
 
 func (g *GithubNotifier) createIssue(title, body string, labels []string) error {
-	// fmt.Printf("Creating issue with title: %s\n", title)
-	// fmt.Printf("Creating issue with body: %s\n", body)
-	// fmt.Printf("Creating issue with labels: %v\n", labels)
+	fmt.Fprintf(os.Stderr, "Creating issue with title: %s\n", title)
+	fmt.Fprintf(os.Stderr, "Creating issue with body: %s\n", body)
+	fmt.Fprintf(os.Stderr, "Creating issue with labels: %v\n", labels)
 
 	// return nil
 
@@ -85,10 +85,9 @@ func (g *GithubNotifier) createIssue(title, body string, labels []string) error 
 }
 
 func (g *GithubNotifier) findIssue(title string) (*[]github.Issue, error) {
+	// print to stderror for debugging
+	fmt.Fprintf(os.Stderr, "Searching for issue with title: %s\n", title)
 	client := github.NewClient(nil).WithAuthToken(g.AccessToken)
-
-
-
 	issues, _, err := client.Issues.ListByRepo(context.Background(), g.Organization, g.RepositoryName, &github.IssueListByRepoOptions{
 		Labels: []string{"abyssal"},
 		State:  "open",
@@ -152,11 +151,13 @@ func (g *GithubNotifier) Notify(payload interface{}) error {
 
 	ghPayload, ok := payload.(GithubNotificationPayload)
 	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
 		return nil // Invalid payload type
 	}
 
 	err := g.createIssue(ghPayload.Title, ghPayload.Body, g.IssueLabels)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating GitHub issue: %v\n", err)
 		return err
 	}
 	// Implement the logic to send a notification to GitHub
@@ -171,21 +172,21 @@ func (g *GithubNotifier) NeedsNotification(payload interface{}) bool {
 	}
 	ghPayload, ok := payload.(GithubNotificationPayload)
 	if !ok {
-		// fmt.Println("Invalid payload type for GitHub notifier")
+		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
 		return false // Invalid payload type
 	}
 
 	issues, err := g.findIssue(ghPayload.Title)
 	if err != nil {
-		// fmt.Printf("Error checking for existing issue: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
 		return false // Error occurred while checking for existing issue
 	}
 
 	if issues != nil && len(*issues) > 0 {
-		// fmt.Printf("Issue with title '%s' already exists.\n", ghPayload.Title)
+		fmt.Fprintf(os.Stderr, "Issue with title '%s' already exists.\n", ghPayload.Title)
 		return false // Notification already exists
 	}
-	// fmt.Printf("No existing issue found with title '%s'. Proceeding to create a new issue.\n", ghPayload.Title)
+	fmt.Fprintf(os.Stderr, "No existing issue found with title '%s'. Proceeding to create a new issue.\n", ghPayload.Title)
 	return true
 }
 
