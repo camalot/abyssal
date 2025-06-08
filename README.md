@@ -1,7 +1,7 @@
-# ABYSSAL
+# Abyssal
 
-## GITHUB ACTION
+## Github Action
 
-### SUMMARY
+### Summary
 
 ![action summary sample](docs/assets/action-summary.png)
