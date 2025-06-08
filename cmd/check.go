@@ -28,13 +28,13 @@ var CheckCmd = &cobra.Command{
 			}
 			for _, target := range targets {
 				// convert the targets in to Packages
-				outdated, current, expected, err := p.CheckVersionOutOfDate(target)
+				result, err := p.CheckVersionOutOfDate(target)
 				if err != nil {
 					Logger.Errorf("Error checking package %s: %v", target.Name, err)
 					continue
 				}
-				if outdated {
-					Logger.Warnf("%s is out of date! Current version: %s - Latest version: %s", target.Name, current, expected)
+				if result.Outdated {
+					Logger.Warnf("%s is out of date! Current version: %s - Latest version: %s", target.Name, result.CurrentVersion, result.ExpectedVersion)
 				} else {
 					Logger.Infof("%s is up to date.", target.Name)
 				}

@@ -148,7 +148,7 @@ func (p *ArgoAppOfAppsProvider) Load() error {
 		for i := range target {
 			if p.TargetNameFrom != "" {
 				if name, ok := target[i].Map[p.TargetNameFrom].(string); ok && name != "" {
-					target[i].Name = name // set the name field to the value of targetNameFrom
+					target[i].Name = name   // set the name field to the value of targetNameFrom
 					target[i].Source = file // set the source field to the file path
 				}
 			}
@@ -174,37 +174,70 @@ func (p *ArgoAppOfAppsProvider) GetTargets() ([]ProviderTarget, error) {
 	return targets, nil
 }
 
-func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (bool, string, string, error) {
+func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (ProviderCheckResult, error) {
 
 	repoUrl, ok := target.Map["repoURL"].(string)
 	if !ok || repoUrl == "" {
-		return false, "", "", fmt.Errorf("failed to get repoURL from target: missing or not a string")
+		err := fmt.Errorf("failed to get repoURL from target: missing or not a string")
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           err.Error(),
+			State: ProviderCheckStateError,
+		}, err
 	}
 	targetRevision, ok := target.Map["targetRevision"].(string)
 	if !ok || targetRevision == "" {
-		return false, "", "", fmt.Errorf("failed to get targetRevision from target: missing or not a string")
+		err := fmt.Errorf("failed to get targetRevision from target: missing or not a string")
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           err.Error(),
+			State: ProviderCheckStateError,
+		}, err
 	}
-	// chartName, ok := target.Map["chartName"].(string)
-	// if !ok || chartName == "" {
-	// 	return false, "", "", fmt.Errorf("failed to get chartName from target: missing or not a string")
-	// }
 
 	// pull repo data
 	entriesUrl, err := url.JoinPath(strings.TrimSpace(repoUrl), "index.yaml")
 	if err != nil {
-		return false, "", "", fmt.Errorf("failed to join path: %w", err)
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Sprintf("failed to join path: %v", err),
+			State: ProviderCheckStateError,
+		}, fmt.Errorf("failed to join path: %w", err)
 	}
 
 	// Fetch the index.yaml file from the Helm repository
 	// this should cache the index.yaml file in the future
 	entriesYaml, err := p.getURLContent(strings.TrimSpace(repoUrl), "index.yaml")
 	if err != nil {
-		return false, "", "", fmt.Errorf("failed to fetch index.yaml from %s: %w", entriesUrl, err)
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Sprintf("failed to fetch index.yaml from %s: %v", entriesUrl, err),
+			State: ProviderCheckStateError,
+		}, fmt.Errorf("failed to fetch index.yaml from %s: %w", entriesUrl, err)
 	}
 	queryTemplate := templates.NewTemplate("query", p.EntriesSelector, target)
 	query, err := queryTemplate.Render()
 	if err != nil {
-		return false, "", "", fmt.Errorf("failed to render query template: %w", err)
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Errorf("failed to render query template: %w", err).Error(),
+			State: ProviderCheckStateError,
+		}, fmt.Errorf("failed to render query template: %w", err)
 	}
 
 	ymlPrefs := &yq.YamlPreferences{
@@ -223,11 +256,25 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (bo
 	result, err := evaluator.Evaluate(query, string(entriesYaml), encoder, decoder)
 
 	if err != nil {
-		return false, "", "", fmt.Errorf("failed to evaluate query '%s' on index.yaml: %w", query, err)
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Sprintf("failed to evaluate query '%s' on index.yaml: %v", query, err),
+			State:           ProviderCheckStateSkipped,
+		}, fmt.Errorf("failed to evaluate query '%s' on index.yaml: %w", query, err)
 	}
 	// trim the result to get the version string
 	if result == "" {
-		return false, "", "", fmt.Errorf("no result found for query '%s' on index.yaml", query)
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Sprintf("no result found for query '%s' on index.yaml", query),
+			State:           ProviderCheckStateSkipped,
+		}, fmt.Errorf("no result found for query '%s' on index.yaml", query)
 	}
 
 	logrus.Debugf("Result of query '%s': %s\n", query, result)
@@ -237,22 +284,62 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (bo
 	expectedVersion, err := version.NewVersion(result)
 	if err != nil {
 		logrus.Debugln(string(entriesYaml))
-		return false, "", "", fmt.Errorf("failed to parse expectedVersion '%s': %w", result, err)
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Sprintf("failed to parse expectedVersion '%s': %v", result, err),
+			State:           ProviderCheckStateError,
+		}, fmt.Errorf("failed to parse expectedVersion '%s': %w", result, err)
 	}
 
 	currentVersion, err := version.NewVersion(targetRevision)
 	if err != nil {
-		return false, "", "", fmt.Errorf("failed to parse current version '%s': %w", targetRevision, err)
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Sprintf("failed to parse current version '%s': %v", targetRevision, err),
+			State:           ProviderCheckStateError,
+		}, fmt.Errorf("failed to parse current version '%s': %w", targetRevision, err)
 	}
 	if currentVersion.LessThan(expectedVersion) {
 		logrus.Debugf("%s is out of date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
-		return true, currentVersion.String(), expectedVersion.String(), nil
+		return ProviderCheckResult{
+			Outdated:        true,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			State:           ProviderCheckStateSuccess,
+		}, nil
 	} else if currentVersion.Equal(expectedVersion) {
 		logrus.Debugf("%s is up to date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
-		return false, currentVersion.String(), expectedVersion.String(), nil
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			State:           ProviderCheckStateSuccess,
+		}, nil
+	} else if currentVersion.GreaterThan(expectedVersion) {
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			State:           ProviderCheckStateWarning,
+		}, fmt.Errorf("%s has a newer version: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
 	} else {
-		logrus.Debugf("%s has a newer version: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
-		return false, currentVersion.String(), expectedVersion.String(), nil
+		return ProviderCheckResult{
+			Outdated:        true,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			Error:           fmt.Sprintf("unexpected version comparison: current version %s, expected version %s", currentVersion.String(), expectedVersion.String()),
+			State:           ProviderCheckStateError,
+		}, fmt.Errorf("unexpected version comparison: current version %s, expected version %s", currentVersion.String(), expectedVersion.String())
 	}
 }
 
@@ -265,17 +352,40 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableHeader() string {
 		"|---------|--------|------------|-----------------|------------------|--------|\n"
 }
 
-func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(target ProviderTarget, outdated bool, currentVersion string, expectedVersion string) string {
-	status := "✅"
-	if outdated {
-		status = "❌"
+// func (p *ArgoAppOfAppsProvider) GenerateMarkdown(result ProviderCheckResult) string {
+// 	builder := strings.Builder{}
+// 	builder.WriteString(fmt.Sprintf("## %s\n\n", p.GetName()))
+// 	builder.WriteString(p.GetMarkdownTableHeader())
+// 	builder.WriteString(p.GetMarkdownTableRow(result))
+// 	return builder.String()
+// }
+
+func (p *ArgoAppOfAppsProvider) getStatusIcon(result ProviderCheckResult) string {
+	if result.State == ProviderCheckStateWarning {
+		return "⚠️"
+	} else if result.State == ProviderCheckStateError {
+		return "❗"
+	} else if result.State == ProviderCheckStateSkipped {
+		return "⏭️"
+	} else if result.State == ProviderCheckStateFailure {
+		return "❌"
+	} else if result.State == ProviderCheckStateSuccess && !result.Outdated {
+		return "✅"
+	} else if result.State == ProviderCheckStateSuccess && result.Outdated {
+		return "🔄"
+	} else {
+		return "❓" // Unknown state
 	}
+}
+
+func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(result ProviderCheckResult) string {
+	status := p.getStatusIcon(result)
 	return fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
-		target.Name,
-		target.Source,
-		target.Map["repoURL"],
-		currentVersion,
-		expectedVersion,
+		result.Target.Name,
+		result.Target.Source,
+		result.Target.Map["repoURL"],
+		result.CurrentVersion,
+		result.ExpectedVersion,
 		status)
 }
 

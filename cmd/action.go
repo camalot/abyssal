@@ -40,14 +40,21 @@ var ActionCmd = &cobra.Command{
 
 			for _, target := range targets {
 				// convert the targets in to Packages
-				outdated, current, expected, err := p.CheckVersionOutOfDate(target)
+				result, err := p.CheckVersionOutOfDate(target)
 				if err != nil {
-					fmt.Print(p.GetMarkdownTableRow(target, false, "", fmt.Sprintf("Error checking package: %v", err)))
+					fmt.Print(p.GetMarkdownTableRow(providers.ProviderCheckResult{
+						Outdated: result.Outdated,
+						CurrentVersion: result.CurrentVersion,
+						ExpectedVersion: result.ExpectedVersion,
+						Target:   target,
+						State:    result.State,
+						Error:    err.Error(),
+					}))
 					// write to stderr
 					Logger.Errorf("Error checking package %s: %v", target.Name, err)
 					continue
 				}
-				fmt.Print(p.GetMarkdownTableRow(target, outdated, current, expected))
+				fmt.Print(p.GetMarkdownTableRow(result))
 			}
 		}
 
