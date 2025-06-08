@@ -84,13 +84,24 @@ func (g *GithubNotifier) createIssue(title, body string, labels []string) error 
 	return err
 }
 
-func (g *GithubNotifier) findIssue(title string) (*[]github.Issue, error) {
+func (g *GithubNotifier) closeIssue(issue github.Issue) error {
+	fmt.Fprintf(os.Stderr, "Closing issue with number: %d\n", issue.GetNumber())
+
+	client := github.NewClient(nil).WithAuthToken(g.AccessToken)
+	issueRequest := &github.IssueRequest{
+		State: github.Ptr("closed"),
+	}
+	_, _, err := client.Issues.Edit(context.Background(), g.Organization, g.RepositoryName, issue.GetNumber(), issueRequest)
+	return err
+}
+
+func (g *GithubNotifier) findIssue(title, state string, labels []string) (*[]github.Issue, error) {
 	// print to stderror for debugging
 	fmt.Fprintf(os.Stderr, "Searching for issue with title: %s\n", title)
 	client := github.NewClient(nil).WithAuthToken(g.AccessToken)
 	issues, _, err := client.Issues.ListByRepo(context.Background(), g.Organization, g.RepositoryName, &github.IssueListByRepoOptions{
-		Labels: []string{"abyssal"},
-		State:  "open",
+		Labels: labels,
+		State:  state,
 	})
 	if err != nil {
 		return nil, err
@@ -140,6 +151,89 @@ func (g *GithubNotifier) GetName() string {
 	return "GitHub Notifier"
 }
 
+func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface{}) {
+	ghPayload, ok := payload.(GithubNotificationPayload)
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
+		return false, nil // Invalid payload type
+	}
+
+	issues, err := g.findIssue(ghPayload.Title, "open", ghPayload.IssueLabels)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
+		return false, nil // Error occurred while checking for existing issue
+	}
+
+	if issues != nil && len(*issues) > 0 {
+		fmt.Fprintf(os.Stderr, "Issue with title '%s' already exists.\n", ghPayload.Title)
+		// Return true and the existing issues
+		existingIssues := make([]interface{}, len(*issues))
+		for i, issue := range *issues {
+			existingIssues[i] = issue // Convert github.Issue to interface{}
+		}
+		// this should return []github.Issue or nil if no issue exists
+		return true, existingIssues
+	}
+	return false, nil // No existing issue found
+}
+
+func (g *GithubNotifier) CloseNotification(payload interface{}) error {
+	ghIssue, ok := payload.(github.Issue)
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
+		return fmt.Errorf("invalid payload type for GitHub notifier") // Invalid payload type
+	}
+	return g.closeIssue(ghIssue)
+}
+
+func (g *GithubNotifier) ProcessResult(result *providers.ProviderCheckResult) error {
+	fmt.Fprintf(os.Stderr, "Processing result for GitHub notifier: %v\n", result)
+	if !g.Enabled {
+		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping processing.")
+		return nil // No processing needed if not enabled
+	}
+
+	payload, err := g.CreatePayload(g.NotifierConfig, result)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating payload for GitHub notifier: %v\n", err)
+		return err
+	}
+
+	if result.Outdated && g.NeedsNotification(payload) {
+		if err := g.Notify(payload); err != nil {
+			fmt.Fprintf(os.Stderr, "Error sending notification with GitHub notifier: %v\n", err)
+			return err // Error occurred while sending notification
+		}
+		fmt.Fprintln(os.Stderr, "Notification sent successfully.")
+	} else if !result.Outdated {
+		hasNotification, existingIssues := g.HasNotification(payload)
+		if !hasNotification || existingIssues == nil || len(existingIssues) == 0 {
+			fmt.Fprintln(os.Stderr, "No existing notification found, nothing to close.")
+			return nil // No existing notification found, nothing to close
+		}
+
+		ghIssues, ok := existingIssues[0].([]github.Issue)
+		if !ok || len(ghIssues) == 0 {
+			fmt.Fprintln(os.Stderr, "No existing issues found to close.")
+			return nil // No existing issues found to close
+		}
+
+		// close them all
+		for _, issue := range ghIssues {
+			fmt.Fprintln(os.Stderr, "Closing notification as the package is no longer outdated.")
+			if err := g.CloseNotification(issue); err != nil {
+				fmt.Fprintf(os.Stderr, "Error closing issue with GitHub notifier: %v\n", err)
+				return err // Error occurred while closing issue
+			}
+			fmt.Fprintf(os.Stderr, "Closed issue with number: %d\n", issue.GetNumber())
+		}
+	} else {
+		fmt.Fprintln(os.Stderr, "No notification needed for this result.")
+	}
+
+	return nil
+}
+
 // Notify sends a notification with the given payload.
 func (g *GithubNotifier) Notify(payload interface{}) error {
 	if !g.Enabled {
@@ -176,7 +270,7 @@ func (g *GithubNotifier) NeedsNotification(payload interface{}) bool {
 		return false // Invalid payload type
 	}
 
-	issues, err := g.findIssue(ghPayload.Title)
+	issues, err := g.findIssue(ghPayload.Title, "open", g.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
 		return false // Error occurred while checking for existing issue

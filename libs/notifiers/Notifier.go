@@ -11,9 +11,14 @@ type Notifier interface {
 	// this method checks if the notifier needs to send a notification
 	// this can be used to avoid duplicate notifications
 	NeedsNotification(payload interface{}) bool
+	HasNotification(payload interface{}) (bool, []interface{})
+
+	CloseNotification(payload interface{}) error
 
 	CreatePayload(config config.NotifierElement, result *providers.ProviderCheckResult) (interface{}, error)
 	GetNotifierConfig() config.NotifierElement
+
+	ProcessResult(result *providers.ProviderCheckResult) error
 
 	IsEnabled() bool
 	GetName() string

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/camalot/abyssal/libs/notifiers"
@@ -15,10 +16,10 @@ var ActionCmd = &cobra.Command{
 	Short: "Check for outdated packages",
 	Long:  `Check for outdated packages in your project. For use from within a github action.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		Logger.Out = cmd.OutOrStderr()
+		Logger.Out = os.Stderr
 		start := time.Now()
 
-		fmt.Printf("# Abyssal - Results\n\n")
+		fmt.Fprintf(os.Stdout, "# Abyssal - Results\n\n")
 
 		// prepare notifiers
 		notifiersList := make([]notifiers.Notifier, 0)
@@ -43,7 +44,7 @@ var ActionCmd = &cobra.Command{
 			if err := p.Load(); err != nil {
 				Logger.Fatalf("Error loading Argo provider: %v", err)
 			}
-			fmt.Printf("## Provider: %s\n\n", p.GetName())
+			fmt.Fprintf(os.Stdout, "## Provider: %s\n\n", p.GetName())
 
 			targets, err := p.GetTargets()
 			if err != nil {
@@ -54,13 +55,13 @@ var ActionCmd = &cobra.Command{
 				continue
 			}
 
-			fmt.Print(p.GetMarkdownTableHeader())
+			fmt.Fprintf(os.Stdout, p.GetMarkdownTableHeader())
 
 			for _, target := range targets {
 				// convert the targets in to Packages
 				result, err := p.CheckVersionOutOfDate(target)
 				if err != nil {
-					fmt.Print(p.GetMarkdownTableRow(providers.ProviderCheckResult{
+					fmt.Fprintf(os.Stdout, p.GetMarkdownTableRow(providers.ProviderCheckResult{
 						Outdated:        result.Outdated,
 						CurrentVersion:  result.CurrentVersion,
 						ExpectedVersion: result.ExpectedVersion,
@@ -73,30 +74,23 @@ var ActionCmd = &cobra.Command{
 					Logger.Errorf("Error checking package %s: %v", target.Name, err)
 					continue
 				}
-				fmt.Print(p.GetMarkdownTableRow(result))
+				fmt.Fprint(os.Stdout, p.GetMarkdownTableRow(result))
 
 				for _, notifier := range notifiersList {
-					notifyPayload, err := notifier.CreatePayload(notifier.GetNotifierConfig(), &result)
+					err := notifier.ProcessResult(&result)
 					if err != nil {
-						Logger.Errorf("Error creating payload for notifier %s: %v", notifier.GetName(), err)
+						fmt.Fprintf(os.Stderr, "Error processing result with notifier %s: %v\n", notifier.GetName(), err)
 						continue
-					}
-					if result.Outdated && notifier.NeedsNotification(notifyPayload) {
-						if err := notifier.Notify(notifyPayload); err != nil {
-							Logger.Errorf("Error sending notification with %s: %v", notifier.GetName(), err)
-						} else {
-							Logger.Infof("Notification sent with %s for package %s", notifier.GetName(), target.Name)
-						}
 					}
 				}
 			}
-			fmt.Printf("%s\n\n", p.GetMarkdownTableFooter())
-			fmt.Printf("%s\n\n", p.GetMarkdownLegend())
+			fmt.Fprintf(os.Stdout, "%s\n\n", p.GetMarkdownTableFooter())
+			fmt.Fprintf(os.Stdout, "%s\n\n", p.GetMarkdownLegend())
 		}
 
 		duration := time.Since(start)
-		fmt.Printf("---\n\n")
-		fmt.Printf("Execution Duration: %s\n\n", duration)
+		fmt.Fprintf(os.Stdout, "---\n\n")
+		fmt.Fprintf(os.Stdout, "Execution Duration: %s\n\n", duration)
 	},
 }
 
