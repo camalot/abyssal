@@ -65,17 +65,4 @@ func init() {
 	if err != nil {
 		Logger.Fatalln("Error parsing log level", err)
 	}
-	// logrus.SetLevel(logLevel)
-	// logrus.SetFormatter(&easy.Formatter{
-	// 	LogFormat: "[%lvl] %msg\n",
-	// 	// DisableColors: !noColor,
-	// 	// FullTimestamp: false,
-	// 	// DisableQuote: true,
-	// 	// FieldMap: logrus.FieldMap{
-	// 	// 	logrus.FieldKeyMsg:  "msg",
-	// 	// 	logrus.FieldKeyLevel: "level",
-	// 	// },
-	// 	// DisableTimestamp: true,
-	// })
-
 }

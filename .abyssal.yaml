@@ -63,4 +63,3 @@ providers:
   - type: argo-aoa # following the argo app of apps pattern
     directory: "./sample"
     selector: '.sample.applications'
-    nameFrom: 'chartName'

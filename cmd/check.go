@@ -4,6 +4,11 @@ import (
 	"github.com/camalot/abyssal/libs/providers"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+)
+
+var (
+	outputFormat string
 )
 
 var CheckCmd = &cobra.Command{
@@ -36,21 +41,15 @@ var CheckCmd = &cobra.Command{
 
 			}
 		}
-
-		// TODO: loop the providers and load them accordingly
-		// p := providers.NewArgoAppOfAppsProvider(Config)
-
-		// p.EntriesSelector = Config.Settings.Providers.ArgoAppOfApps.EntriesSelector
-		// p.Directory = "./sample"
-		// p.Selector = " .cloudimanage.applications "
-		// p.Evaluator = Config.Settings.Providers.ArgoAppOfApps.EvaluatorSelector
-
-
 	},
 }
 
 func init() {
 	RootCmd.AddCommand(CheckCmd)
+
+	CheckCmd.PersistentFlags().StringVarP(&outputFormat, "output-format", "o", "text", "Output format (text|json|yaml|markdown)")
+	CheckCmd.PersistentFlags().Lookup("output-format").DefValue = "text"
+	viper.BindPFlag("output-format", CheckCmd.PersistentFlags().Lookup("output-format"))
 
 	logrus.Debugln("Loaded configuration:", Config)
 
