@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 
 	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/envs"
