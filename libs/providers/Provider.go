@@ -28,6 +28,8 @@ type Provider interface {
 	GetMarkdownTableHeader() string
 	GetMarkdownTableRow(result ProviderCheckResult) string
 	GetName() string
+	GetMarkdownLegend() string
+	GetMarkdownTableFooter() string
 }
 
 type ProviderTarget struct {

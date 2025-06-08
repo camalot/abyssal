@@ -43,24 +43,28 @@ var ActionCmd = &cobra.Command{
 				result, err := p.CheckVersionOutOfDate(target)
 				if err != nil {
 					fmt.Print(p.GetMarkdownTableRow(providers.ProviderCheckResult{
-						Outdated: result.Outdated,
-						CurrentVersion: result.CurrentVersion,
+						Outdated:        result.Outdated,
+						CurrentVersion:  result.CurrentVersion,
 						ExpectedVersion: result.ExpectedVersion,
-						Target:   target,
-						State:    result.State,
-						Error:    err.Error(),
+						Target:          target,
+						State:           result.State,
+						Error:           err.Error(),
 					}))
 					// write to stderr
+					Logger.Out = cmd.ErrOrStderr()
 					Logger.Errorf("Error checking package %s: %v", target.Name, err)
 					continue
 				}
 				fmt.Print(p.GetMarkdownTableRow(result))
 			}
+			fmt.Printf("%s\n\n", p.GetMarkdownTableFooter())
+			fmt.Printf("%s\n\n", p.GetMarkdownLegend())
+			fmt.Printf("---\n\n")
 		}
 
 		duration := time.Since(start)
-		fmt.Printf("\n---\n\n")
-		fmt.Printf("Execution Duration: %s\n", duration)
+		fmt.Printf("---\n\n")
+		fmt.Printf("Execution Duration: %s\n\n", duration)
 	},
 }
 

@@ -348,8 +348,20 @@ func (p *ArgoAppOfAppsProvider) GetName() string {
 }
 
 func (p *ArgoAppOfAppsProvider) GetMarkdownTableHeader() string {
-	return "| Package | Source | Repository | Current Version | Expected Version | Status |\n" +
-		"|---------|--------|------------|-----------------|------------------|--------|\n"
+	// return "| Package | Source | Repository | Current Version | Expected Version | Status |\n" +
+	// 	"|---------|--------|------------|-----------------|------------------|--------|\n"
+	return `<table>
+	<thead>
+		<tr>
+			<th>Package</th>
+			<th>Source</th>
+			<th>Repository</th>
+			<th>Current Version</th>
+			<th>Expected Version</th>
+			<th>Status</th>
+		</tr>
+	</thead>
+	<tbody>`
 }
 
 // func (p *ArgoAppOfAppsProvider) GenerateMarkdown(result ProviderCheckResult) string {
@@ -359,6 +371,23 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableHeader() string {
 // 	builder.WriteString(p.GetMarkdownTableRow(result))
 // 	return builder.String()
 // }
+
+func (p *ArgoAppOfAppsProvider) GetMarkdownTableFooter() string {
+	return `</tbody>
+</table>`
+}
+
+func (p *ArgoAppOfAppsProvider) GetMarkdownLegend() string {
+	return `### Status Legend
+
+- ✅ Up to date
+- 🔄 Outdated
+- ⚠️ Warning
+- ❗ Error
+- ❌ Failure
+- ⏭️ Skipped
+`
+}
 
 func (p *ArgoAppOfAppsProvider) getStatusIcon(result ProviderCheckResult) string {
 	if result.State == ProviderCheckStateWarning {
@@ -380,13 +409,40 @@ func (p *ArgoAppOfAppsProvider) getStatusIcon(result ProviderCheckResult) string
 
 func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(result ProviderCheckResult) string {
 	status := p.getStatusIcon(result)
-	return fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
+	rows := strings.Builder{}
+	row := fmt.Sprintf(`
+		<tr>
+			<td>%s</td>
+			<td>%s</td>
+			<td>%s</td>
+			<td>%s</td>
+			<td>%s</td>
+			<td>%s</td>
+		</tr>`,
 		result.Target.Name,
 		result.Target.Source,
 		result.Target.Map["repoURL"],
 		result.CurrentVersion,
 		result.ExpectedVersion,
-		status)
+		status,
+	)
+	// row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
+	// 	result.Target.Name,
+	// 	result.Target.Source,
+	// 	result.Target.Map["repoURL"],
+	// 	result.CurrentVersion,
+	// 	result.ExpectedVersion,
+	// 	status)
+	rows.WriteString(row)
+	if result.Error != "" {
+		// errorRow := fmt.Sprintf("| Error: %s |\n", result.Error)
+		errorRow := fmt.Sprintf(`
+		<tr>
+			<td colspan="6" style="color: red;">Error: %s</td>
+		</tr>`, result.Error)
+		rows.WriteString(errorRow)
+	}
+	return rows.String()
 }
 
 func (p *ArgoAppOfAppsProvider) writeCachedContent(cacheKey []byte, content []byte) error {
