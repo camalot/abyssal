@@ -534,6 +534,7 @@ func (p *ArgoAppOfAppsProvider) getURLContent(baseUrl string, pathSegments ...st
 				if token == "" {
 					return nil, fmt.Errorf("bearer token is empty for %s", normalizedBaseUrl.String())
 				}
+				logrus.Debugf("Using Bearer token for %s", normalizedBaseUrl.String())
 				client = &http.Client{
 					Transport: &authTransport{
 						base:       http.DefaultTransport,
@@ -585,6 +586,7 @@ func (p *ArgoAppOfAppsProvider) envTemplateValue(template string) string {
 	if err != nil {
 		return template
 	}
+	logrus.Debugf("Rendered template '%s' to '%s'", template, rendered[:5])
 	return rendered
 }
 
