@@ -329,7 +329,7 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			Target:          target,
 			CurrentVersion:  currentVersion.String(),
 			ExpectedVersion: expectedVersion.String(),
-			State:           ProviderCheckStateWarning,
+			State:           ProviderCheckStateError,
 		}, fmt.Errorf("%s has a newer version: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
 	} else {
 		return ProviderCheckResult{
@@ -382,17 +382,14 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownLegend() string {
 
 - ✅ Up to date
 - ❌ Outdated
-- ⚠️ Warning
-- ❗ Error
+- ⚠️ Error
 - ⏭️ Skipped
 `
 }
 
 func (p *ArgoAppOfAppsProvider) getStatusIcon(result ProviderCheckResult) string {
-	if result.State == ProviderCheckStateWarning {
+	if result.State == ProviderCheckStateError {
 		return "⚠️"
-	} else if result.State == ProviderCheckStateError {
-		return "❗"
 	} else if result.State == ProviderCheckStateSkipped {
 		return "⏭️"
 	} else if result.State == ProviderCheckStateSuccess && !result.Outdated {
@@ -435,8 +432,8 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(result ProviderCheckResult) 
 		// errorRow := fmt.Sprintf("| Error: %s |\n", result.Error)
 		errorRow := fmt.Sprintf(`
 		<tr>
-			<td colspan="6" style="color: red;">Error: %s</td>
-		</tr>`, result.Error)
+			<td colspan="6" style="color: red;">%s %s</td>
+		</tr>`, status, result.Error)
 		rows.WriteString(errorRow)
 	}
 	return rows.String()
