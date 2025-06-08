@@ -1,6 +1,6 @@
 # Abyssal
 
-## Github Action
+## GitHub Action
 
 ### Summary
 
