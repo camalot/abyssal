@@ -10,44 +10,44 @@ settings:
   authentication: {}
 
   notifiers:
-    github:
+    - type: github
       enabled: false
-      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
-        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+        Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
       token: "{{ .EnvironmentVariables.GITHUB_TOKEN }}"
       labels: ["abyssal"]
       organization: "{{ .EnvironmentVariables.GITHUB_ORGANIZATION }}"
       repository: "{{ .EnvironmentVariables.GITHUB_REPOSITORY }}"
-    slack:
+    - type: slack
       enabled: false
       webhook: "{{ .EnvironmentVariables.SLACK_WEBHOOK }}"
-      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
-        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
       username: "Abyssal"
       iconEmoji: ":robot_face:"
       channel: "#abyssal-notifications"
-    discord:
+    - type: discord
       enabled: false
       webhook: "{{ .EnvironmentVariables.DISCORD_WEBHOOK }}"
-      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
-        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
       username: "Abyssal"
       avatarURL: "https://avatars.githubusercontent.com/u/123456789?v=4"
-    email:
+    - type: email
       enabled: false
       smtpHost: "{{ .EnvironmentVariables.SMTP_HOST }}"
       smtpPort: "{{ .EnvironmentVariables.SMTP_PORT }}"
       smtpUser: "{{ .EnvironmentVariables.SMTP_USER }}"
       smtpPassword: "{{ .EnvironmentVariables.SMTP_PASSWORD }}"
       from: "{{ .EnvironmentVariables.SMTP_FROM }}"
-    jira:
+    - type: jira
       enabled: false
-      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}"
+      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
-        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .NewVersion }}.
+        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
       user: "{{ .EnvironmentVariables.JIRA_USER }}"
       token: "{{ .EnvironmentVariables.JIRA_TOKEN }}"
       url: "{{ .EnvironmentVariables.JIRA_URL }}"

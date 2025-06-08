@@ -9,13 +9,7 @@ import (
 type AppConfiguration struct {
 	Version  string `yaml:"version"`
 	Settings struct {
-		Notifiers struct {
-			Github  map[string]interface{} `yaml:"github"`
-			Slack   map[string]interface{} `yaml:"slack"`
-			Discord map[string]interface{} `yaml:"discord"`
-			Email   map[string]interface{} `yaml:"email"`
-			Jira    map[string]interface{} `yaml:"jira"`
-		} `yaml:"notifiers"`
+		Notifiers []NotifierElement `yaml:"notifiers"`
 		Providers struct {
 			ArgoAppOfApps struct {
 				EntriesSelector   string `yaml:"entries"`
@@ -28,9 +22,15 @@ type AppConfiguration struct {
 	Providers []ProviderElement `yaml:"providers"`
 }
 
+type NotifierElement struct {
+	Type    string                 `yaml:"type"`
+	Enabled bool                   `yaml:"enabled"`
+	Extra   map[string]interface{} `yaml:",inline"`
+}
+
 type ProviderElement struct {
-	Type     string                 `yaml:"type"`
-	Extra    map[string]interface{} `yaml:",inline"`
+	Type  string                 `yaml:"type"`
+	Extra map[string]interface{} `yaml:",inline"`
 }
 
 type AuthenticationElement struct {
