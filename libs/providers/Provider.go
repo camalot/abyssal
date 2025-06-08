@@ -14,7 +14,6 @@ type ProviderState string
 
 const (
 	ProviderCheckStateSuccess   ProviderState = "success"
-	ProviderCheckStateFailure   ProviderState = "failure"
 	ProviderCheckStateSkipped   ProviderState = "skipped"
 	ProviderCheckStateWarning   ProviderState = "warning"
 	ProviderCheckStateError     ProviderState = "error"

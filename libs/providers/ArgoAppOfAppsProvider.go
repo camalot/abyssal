@@ -381,10 +381,9 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownLegend() string {
 	return `### Status Legend
 
 - ✅ Up to date
-- 🔄 Outdated
+- ❌ Outdated
 - ⚠️ Warning
 - ❗ Error
-- ❌ Failure
 - ⏭️ Skipped
 `
 }
@@ -396,12 +395,10 @@ func (p *ArgoAppOfAppsProvider) getStatusIcon(result ProviderCheckResult) string
 		return "❗"
 	} else if result.State == ProviderCheckStateSkipped {
 		return "⏭️"
-	} else if result.State == ProviderCheckStateFailure {
-		return "❌"
 	} else if result.State == ProviderCheckStateSuccess && !result.Outdated {
 		return "✅"
 	} else if result.State == ProviderCheckStateSuccess && result.Outdated {
-		return "🔄"
+		return "❌"
 	} else {
 		return "❓" // Unknown state
 	}
