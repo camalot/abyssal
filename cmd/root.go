@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/envs"
 	"github.com/sirupsen/logrus"
@@ -27,7 +29,14 @@ var RootCmd = &cobra.Command{
 		cmd.Help() // Display help if no subcommand is provided
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Initialize any persistent settings or configurations here
+		// Load environment variables from .env file
+		envs.LoadDotEnv("./.env")
+
+		Config = &config.AppConfiguration{}
+		err := Config.Load(configFile)
+		if err != nil {
+			logrus.Fatalln("Error loading config file", err)
+		}
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		// Cleanup or finalization logic after all commands have run
@@ -36,16 +45,10 @@ var RootCmd = &cobra.Command{
 
 func init() {
 	var err error
-	// Load environment variables from .env file
-	envs.LoadDotEnv("./.env")
 	viper.BindPFlag("config", RootCmd.PersistentFlags().Lookup("config"))
 	RootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "./.abyssal.yaml", "config file (default is .abyssal.yaml)")
 
-	Config = &config.AppConfiguration{}
-	err = Config.Load(configFile)
-	if err != nil {
-		logrus.Fatalln("Error loading config file", err)
-	}
+
 
 	RootCmd.PersistentFlags().BoolVarP(&noColor, "no-color", "!", false, "Disable color output")
 	viper.BindPFlag("no-color", RootCmd.PersistentFlags().Lookup("no-color"))
