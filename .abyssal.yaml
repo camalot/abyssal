@@ -18,7 +18,7 @@ settings:
       token: "{{ .EnvironmentVariables.GITHUB_TOKEN }}"
       labels: ["abyssal"]
       organization: "{{ .EnvironmentVariables.GITHUB_ORGANIZATION }}"
-      repository: "{{ .EnvironmentVariables.GITHUB_REPOSITORY }}"
+      repository: "{{ .EnvironmentVariables.GITHUB_REPOSITORY_NAME }}"
     - type: slack
       enabled: false
       webhook: "{{ .EnvironmentVariables.SLACK_WEBHOOK }}"

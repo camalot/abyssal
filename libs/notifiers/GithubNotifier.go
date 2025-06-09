@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/camalot/abyssal/config"
@@ -63,6 +64,8 @@ type GithubNotificationPayload struct {
 	Title       string   `json:"title"`
 	Body        string   `json:"body"`
 	IssueLabels []string `json:"issueLabels,omitempty"`
+
+	Result *providers.ProviderCheckResult `json:"result,omitempty"` // This can be used to store the result of the check that triggered the notification
 }
 
 func (g *GithubNotifier) createIssue(title, body string, labels []string) error {
@@ -108,7 +111,9 @@ func (g *GithubNotifier) findIssue(title, state string, labels []string) (*[]git
 	}
 	var foundIssues []github.Issue
 	for _, issue := range issues {
-		if issue.GetTitle() == title {
+		// regex match the title
+		re, _ := regexp.Compile(`(?i)` + title)
+		if re.MatchString(issue.GetTitle()) || title == issue.GetTitle() {
 			foundIssues = append(foundIssues, *issue)
 		}
 	}
@@ -135,8 +140,9 @@ func (g *GithubNotifier) CreatePayload(config config.NotifierElement, result *pr
 		return nil, err // Error occurred while rendering the body
 	}
 	return GithubNotificationPayload{
-		Title: renderedTitle,
-		Body:  renderedBody,
+		Title:  renderedTitle,
+		Body:   renderedBody,
+		Result: result,
 	}, nil
 }
 
@@ -158,7 +164,20 @@ func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface
 		return false, nil // Invalid payload type
 	}
 
-	issues, err := g.findIssue(ghPayload.Title, "open", ghPayload.IssueLabels)
+	titleMatch := ghPayload.Title
+	template, ok := g.NotifierConfig.Extra["title"].(string)
+	if ok {
+
+		regexTitle := templates.NewTemplate("github-notification-search", template, map[string]interface{}{
+			"Target": ghPayload.Result.Target,
+			"ExpectedVersion": ghPayload.Result.ExpectedVersion,
+			"CurrentVersion":  "([^\\s]+?)\\s",
+		})
+		titleMatch, _ = regexTitle.Render()
+		fmt.Fprintf(os.Stderr, "Using regex title match: %s\n", titleMatch)
+	}
+
+	issues, err := g.findIssue(titleMatch, "open", ghPayload.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
 		return false, nil // Error occurred while checking for existing issue
@@ -287,12 +306,12 @@ func (g *GithubNotifier) NeedsNotification(payload interface{}) bool {
 func interfaceSliceToStringSlice(slice interface{}) []string {
 	s := []string{}
 	if slice == nil {
-			return s
+		return s
 	}
 	for _, v := range slice.([]interface{}) {
-			if str, ok := v.(string); ok {
-					s = append(s, str)
-			}
+		if str, ok := v.(string); ok {
+			s = append(s, str)
+		}
 	}
 	return s
 }
@@ -300,6 +319,7 @@ func interfaceSliceToStringSlice(slice interface{}) []string {
 type GithubNotifierTemplateData struct {
 	EnvironmentVariables map[string]string
 }
+
 func envTemplateValue(template string) string {
 	// This function should implement the logic to render a template with environment variables
 	// create a map of environment variables from os.Environ
