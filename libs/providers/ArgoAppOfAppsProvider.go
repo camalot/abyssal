@@ -255,9 +255,7 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 
 	// logrus.Debugf("Evaluating query '%s' on index.yaml", query)
 	evaluator := yq.NewStringEvaluator()
-	os.Setenv("ABYSSAL_INCLUDE_PRERELEASE", fmt.Sprintf("%t", p.IncludePreRelease)) // Disable yq debug output
 	result, err := evaluator.Evaluate(query, string(entriesYaml), encoder, decoder)
-	os.Unsetenv("ABYSSAL_INCLUDE_PRERELEASE") // Unset the environment variable
 
 	if err != nil {
 		return ProviderCheckResult{

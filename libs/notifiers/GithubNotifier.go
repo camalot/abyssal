@@ -172,55 +172,6 @@ func (g *GithubNotifier) GetName() string {
 	return "GitHub Notifier"
 }
 
-func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface{}) {
-	var err error
-	ghPayload, ok := payload.(GithubNotificationPayload)
-	if !ok {
-		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
-		return false, nil // Invalid payload type
-	}
-
-	titleMatch := ghPayload.Title
-	template, ok := g.NotifierConfig.Extra["title"].(string)
-	if ok {
-
-		regexTitle := templates.NewTemplate("github-notification-search", template, map[string]interface{}{
-			"Target": ghPayload.Result.Target,
-			"ExpectedVersion": ghPayload.Result.ExpectedVersion,
-			"CurrentVersion":  "{{ .CurrentVersion }}",
-		})
-		tempTemplate, _ := regexTitle.Render()
-		fmt.Fprintf(os.Stderr, "Using template for title match: %s\n", regexEscapeString(tempTemplate))
-		regexTitle = templates.NewTemplate("github-notification-search", regexEscapeString(tempTemplate), map[string]interface{}{
-			"CurrentVersion":  `([^\s]+?)`,
-		})
-		titleMatch, err = regexTitle.Render()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error rendering title match regex: %v\n", err)
-		}
-		fmt.Fprintf(os.Stderr, "Using regex title match: %s\n", titleMatch)
-	}
-	titleMatch = strings.TrimSpace(titleMatch)
-	fmt.Fprintf(os.Stderr, "Checking for existing issue with title: %s\n", titleMatch)
-	issues, err := g.findIssue(titleMatch, "open", ghPayload.IssueLabels)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
-		return false, nil // Error occurred while checking for existing issue
-	}
-
-	if issues != nil && len(*issues) > 0 {
-		fmt.Fprintf(os.Stderr, "Issue with title '%s' already exists.\n", ghPayload.Title)
-		// Return true and the existing issues
-		existingIssues := []interface{}{}
-		for _, issue := range *issues {
-			existingIssues = append(existingIssues, issue) // Convert github.Issue to interface{}
-		}
-		// this should return []github.Issue or nil if no issue exists
-		return true, existingIssues
-	}
-	return false, nil // No existing issue found
-}
-
 func (g *GithubNotifier) CloseNotification(payload interface{}) error {
 	if !g.Enabled {
 		return nil // No notification to close if not enabled
@@ -287,8 +238,30 @@ func (g *GithubNotifier) Notify(payload interface{}) error {
 	if !g.Enabled {
 		return nil // No notification sent if not enabled
 	}
+
+
 	if !g.NeedsNotification(payload) {
 		return nil // No notification needed if already exists
+	}
+
+	// clean up existing issues if NeedsNotification
+	hasExistingIssues, existingIssues := g.HasNotification(payload)
+
+	if hasExistingIssues && existingIssues != nil && len(existingIssues) > 0 {
+		fmt.Fprintln(os.Stderr, "Found existing issues, closing them before creating a new one.")
+		for _, issue := range existingIssues {
+			ghIssue, ok := issue.(github.Issue)
+			if !ok {
+				fmt.Fprintln(os.Stderr, "Invalid issue type in existing issues")
+				continue // Skip invalid issue type
+			}
+			fmt.Fprintf(os.Stderr, "Closing existing issue with number: %d\n", ghIssue.GetNumber())
+			if err := g.CloseNotification(ghIssue); err != nil {
+				fmt.Fprintf(os.Stderr, "Error closing existing issue with GitHub notifier: %v\n", err)
+				return err // Error occurred while closing existing issue
+			}
+			fmt.Fprintf(os.Stderr, "Closed existing issue with number: %d\n", ghIssue.GetNumber())
+		}
 	}
 
 	ghPayload, ok := payload.(GithubNotificationPayload)
@@ -302,8 +275,62 @@ func (g *GithubNotifier) Notify(payload interface{}) error {
 		fmt.Fprintf(os.Stderr, "Error creating GitHub issue: %v\n", err)
 		return err
 	}
-	// Implement the logic to send a notification to GitHub
+
 	return nil
+}
+
+
+func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface{}) {
+	if !g.Enabled {
+		return false, nil // No notification found if not enabled
+	}
+
+	var err error
+	ghPayload, ok := payload.(GithubNotificationPayload)
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
+		return false, nil // Invalid payload type
+	}
+
+	titleMatch := ghPayload.Title
+	template, ok := g.NotifierConfig.Extra["title"].(string)
+	if ok {
+
+		regexTitle := templates.NewTemplate("github-notification-search", template, map[string]interface{}{
+			"Target": ghPayload.Result.Target,
+			"ExpectedVersion": ghPayload.Result.ExpectedVersion,
+			"CurrentVersion":  "{{ .CurrentVersion }}",
+		})
+		tempTemplate, _ := regexTitle.Render()
+		fmt.Fprintf(os.Stderr, "Using template for title match: %s\n", regexEscapeString(tempTemplate))
+		regexTitle = templates.NewTemplate("github-notification-search", regexEscapeString(tempTemplate), map[string]interface{}{
+			"CurrentVersion":  `([^\s]+?)`,
+		})
+		titleMatch, err = regexTitle.Render()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error rendering title match regex: %v\n", err)
+		}
+		fmt.Fprintf(os.Stderr, "Using regex title match: %s\n", titleMatch)
+	}
+	titleMatch = strings.TrimSpace(titleMatch)
+	fmt.Fprintf(os.Stderr, "Checking for existing issue with title: %s\n", titleMatch)
+	issues, err := g.findIssue(titleMatch, "open", ghPayload.IssueLabels)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
+		return false, nil // Error occurred while checking for existing issue
+	}
+
+	if issues != nil && len(*issues) > 0 {
+		fmt.Fprintf(os.Stderr, "Issue with title '%s' already exists.\n", ghPayload.Title)
+		// Return true and the existing issues
+		existingIssues := []interface{}{}
+		for _, issue := range *issues {
+			existingIssues = append(existingIssues, issue) // Convert github.Issue to interface{}
+		}
+		// this should return []github.Issue or nil if no issue exists
+		return true, existingIssues
+	}
+	return false, nil // No existing issue found
 }
 
 // NeedsNotification checks if the notifier needs to send a notification
@@ -317,7 +344,7 @@ func (g *GithubNotifier) NeedsNotification(payload interface{}) bool {
 		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
 		return false // Invalid payload type
 	}
-
+	// this finds an existing issue with the exact same title
 	issues, err := g.findIssue(ghPayload.Title, "open", g.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
@@ -332,48 +359,3 @@ func (g *GithubNotifier) NeedsNotification(payload interface{}) bool {
 	return true
 }
 
-func interfaceSliceToStringSlice(slice interface{}) []string {
-	s := []string{}
-	if slice == nil {
-		return s
-	}
-	for _, v := range slice.([]interface{}) {
-		if str, ok := v.(string); ok {
-			s = append(s, str)
-		}
-	}
-	return s
-}
-
-type GithubNotifierTemplateData struct {
-	EnvironmentVariables map[string]string
-}
-
-func envTemplateValue(template string) string {
-	// This function should implement the logic to render a template with environment variables
-	// create a map of environment variables from os.Environ
-	envVars := make(map[string]string)
-
-	for _, env := range os.Environ() {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			// fmt.Printf("Adding env var: %s=%s\n", parts[0], parts[1])
-			envVars[parts[0]] = parts[1]
-		}
-	}
-	result := templates.NewTemplate("templated-value", template, &GithubNotifierTemplateData{
-		EnvironmentVariables: envVars,
-	})
-	rendered, err := result.Render()
-	if err != nil {
-		return template
-	}
-	return rendered
-}
-
-
-func regexEscapeString(s string) string {
-	// Escape special characters for regex
-	re := regexp.MustCompile(`([*+?^$()|[\]])`)
-	return re.ReplaceAllString(s, `\$1`)
-}

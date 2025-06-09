@@ -31,18 +31,18 @@ settings:
     - type: slack
       enabled: false
       webhook: "{{ .EnvironmentVariables.SLACK_WEBHOOK }}"
-      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
+      title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
-        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
+        Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
       username: "Abyssal"
       iconEmoji: ":robot_face:"
       channel: "#abyssal-notifications"
     - type: discord
       enabled: false
       webhook: "{{ .EnvironmentVariables.DISCORD_WEBHOOK }}"
-      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
+      title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
-        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
+        Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
       username: "Abyssal"
       avatarURL: "https://avatars.githubusercontent.com/u/123456789?v=4"
     - type: email
@@ -54,9 +54,9 @@ settings:
       from: "{{ .EnvironmentVariables.SMTP_FROM }}"
     - type: jira
       enabled: false
-      title: "[Abyssal] Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
+      title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
-        Bump {{ .Target }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
+        Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
       user: "{{ .EnvironmentVariables.JIRA_USER }}"
       token: "{{ .EnvironmentVariables.JIRA_TOKEN }}"
       url: "{{ .EnvironmentVariables.JIRA_URL }}"
