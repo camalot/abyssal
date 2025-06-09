@@ -502,8 +502,8 @@ func (p *ArgoAppOfAppsProvider) getURLContent(baseUrl string, pathSegments ...st
 				client = &http.Client{
 					Transport: &basicAuthTransport{
 						base:     http.DefaultTransport,
-						username: p.envTemplateValue(auth.Username),
-						password: p.envTemplateValue(auth.Password),
+						username: envTemplateValue(auth.Username),
+						password: envTemplateValue(auth.Password),
 					},
 					Timeout: 10 * time.Second,
 				}
@@ -512,13 +512,13 @@ func (p *ArgoAppOfAppsProvider) getURLContent(baseUrl string, pathSegments ...st
 				client = &http.Client{
 					Transport: &authTransport{
 						base:       http.DefaultTransport,
-						authHeader: fmt.Sprintf("Token %s", p.envTemplateValue(auth.Token)),
+						authHeader: fmt.Sprintf("Token %s", envTemplateValue(auth.Token)),
 					},
 					Timeout: 10 * time.Second,
 				}
 
 			case "bearer":
-				token := p.envTemplateValue(auth.Token)
+				token := envTemplateValue(auth.Token)
 				if token == "" {
 					return nil, fmt.Errorf("bearer token is empty for %s", normalizedBaseUrl.String())
 				}
@@ -551,54 +551,6 @@ func (p *ArgoAppOfAppsProvider) getURLContent(baseUrl string, pathSegments ...st
 	return finalContent, nil
 }
 
-type ArgoAppOfAppsProviderAuthenticationTemplateData struct {
-	EnvironmentVariables map[string]string
-}
-
-func (p *ArgoAppOfAppsProvider) envTemplateValue(template string) string {
-	// This function should implement the logic to render a template with environment variables
-	// create a map of environment variables from os.Environ
-	envVars := make(map[string]string)
-
-	for _, env := range os.Environ() {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			// fmt.Printf("Adding env var: %s=%s\n", parts[0], parts[1])
-			envVars[parts[0]] = parts[1]
-		}
-	}
-	result := templates.NewTemplate("templated-value", template, &ArgoAppOfAppsProviderAuthenticationTemplateData{
-		EnvironmentVariables: envVars,
-	})
-	rendered, err := result.Render()
-	if err != nil {
-		return template
-	}
-	logrus.Debugf("Rendered template '%s' to '%s'", template, rendered[:5])
-	return rendered
-}
-
-func cleanValueForVersion(value string) string {
-	// Remove any leading or trailing whitespace
-	value = strings.TrimSpace(value)
-
-	// Remove any leading 'v' character
-	value = strings.TrimPrefix(value, "v")
-
-	// remove any quotes
-	value = strings.Trim(value, "\"'")
-
-	// Remove any trailing characters that are not digits, dots, or hyphens
-	// for i := len(value) - 1; i >= 0; i-- {
-	// 	if !(value[i] >= '0' && value[i] <= '9') && value[i] != '.' && value[i] != '-' {
-	// 		value = value[:i]
-	// 	} else {
-	// 		break
-	// 	}
-	// }
-
-	return value
-}
 
 type authTransport struct {
 	base       http.RoundTripper

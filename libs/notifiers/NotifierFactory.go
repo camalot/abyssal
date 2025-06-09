@@ -1,15 +1,20 @@
 package notifiers
 
-import "github.com/camalot/abyssal/config"
+import (
+	"strings"
+
+	"github.com/camalot/abyssal/config"
+)
 
 type NotifierFactory struct {
-
 }
 
 func NewNotifier(notifierElement config.NotifierElement, config *config.AppConfiguration) Notifier {
-	switch notifierElement.Type {
+	switch strings.TrimSpace(strings.ToLower(notifierElement.Type)) {
 	case "github":
 		return NewGithubNotifier(notifierElement, config)
+	case "jira":
+		return NewJiraNotifier(notifierElement, config)
 
 	// case "slack":
 	// 	return NewSlackNotifier()
@@ -17,8 +22,6 @@ func NewNotifier(notifierElement config.NotifierElement, config *config.AppConfi
 	// 	return NewDiscordNotifier()
 	// case "email":
 	// 	return NewEmailNotifier()
-	// case "jira":
-	// 	return NewJiraNotifier()
 	default:
 		return nil
 	}

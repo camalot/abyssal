@@ -7,6 +7,49 @@ Abyssal is a tool that helps check that dependencies are up to date. The goal of
 - Check dependency versions for Helm charts when using the ArgoCD App of Apps pattern.
 - Accompanying project [abyssal-setup](https://github.com/camalot/abyssal-setup) to allow integration directly in GitHub Actions.
 
+## Notifiers
+
+Notifiers are a way to send the information about the current state of the `providers.ProvidersCheckResult`.
+
+- GitHub Notifier
+  - Creates a new GitHub issue when a release is outdated. It will close previous issues opened if there is a new release but the previous hasn't been addressed.
+  - It will only create an issue if there is not currently an open issue for that release.
+
+  ``` yaml
+    - type: github
+      enabled: true
+      title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
+      body: |
+        Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
+      token: "{{ .EnvironmentVariables.GITHUB_TOKEN }}"
+      labels: ["abyssal"]
+      organization: "{{ .EnvironmentVariables.GITHUB_ORGANIZATION }}"
+      repository: "{{ .EnvironmentVariables.GITHUB_REPOSITORY_NAME }}"
+  ```
+
+  - Configuration:
+    - `title`: A `template` that is passed a `providers.ProviderCheckResult` payload used for the issue title.
+    - `body`: A `template` that is passed a `providers.ProviderCheckResult` payload used for the issue body.
+    - `token`: A `template` that is passed a `notifiers.EnvironmentTemplateData` payload. You can use any environment variable as the value.
+    - `organization`: A `template` that is passed a `notifiers.EnvironmentTemplateData` payload. You can use any environment variable as the value.
+    - `repository`: A `template` that is passed a `notifiers.EnvironmentTemplateData` payload. You can use any environment variable as the value.
+    - `labels`: Array of `strings` that will be added to the issue. Not currently templated at all.
+
+- Jira Notifier (WIP)
+
+  ``` yaml
+    - type: jira
+      enabled: false
+      title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
+      body: |
+        Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
+      user: "{{ .EnvironmentVariables.JIRA_USER }}"
+      token: "{{ .EnvironmentVariables.JIRA_TOKEN }}"
+      url: "{{ .EnvironmentVariables.JIRA_URL }}"
+      project: "{{ .EnvironmentVariables.JIRA_PROJECT }}"
+      issueType: "{{ .EnvironmentVariables.JIRA_ISSUE_TYPE }}"
+      labels: ["abyssal"]
+  ```
 
 ## GitHub Action Summary
 
