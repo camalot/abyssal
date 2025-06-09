@@ -87,6 +87,18 @@ func (g *GithubNotifier) createIssue(title, body string, labels []string) error 
 	return err
 }
 
+func (g *GithubNotifier) commentOnIssue(issue github.Issue, comment string) error {
+	fmt.Fprintf(os.Stderr, "Commenting on issue with number: %d\n", issue.GetNumber())
+	fmt.Fprintf(os.Stderr, "Comment content: %s\n", comment)
+
+	client := github.NewClient(nil).WithAuthToken(g.AccessToken)
+	commentRequest := &github.IssueComment{
+		Body: github.Ptr(comment),
+	}
+	_, _, err := client.Issues.CreateComment(context.Background(), g.Organization, g.RepositoryName, issue.GetNumber(), commentRequest)
+	return err
+}
+
 func (g *GithubNotifier) closeIssue(issue github.Issue) error {
 	fmt.Fprintf(os.Stderr, "Closing issue with number: %d\n", issue.GetNumber())
 
@@ -210,11 +222,16 @@ func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface
 }
 
 func (g *GithubNotifier) CloseNotification(payload interface{}) error {
+	if !g.Enabled {
+		return nil // No notification to close if not enabled
+	}
 	ghIssue, ok := payload.(github.Issue)
 	if !ok {
 		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
 		return fmt.Errorf("invalid payload type for GitHub notifier") // Invalid payload type
 	}
+	fmt.Fprintf(os.Stderr, "Closing notification for issue with number: %d\n", ghIssue.GetNumber())
+	g.commentOnIssue(ghIssue, "Closing this issue as the package is no longer outdated.")
 	return g.closeIssue(ghIssue)
 }
 
