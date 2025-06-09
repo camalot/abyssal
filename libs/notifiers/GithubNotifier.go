@@ -111,6 +111,9 @@ func (g *GithubNotifier) findIssue(title, state string, labels []string) (*[]git
 	}
 	var foundIssues []github.Issue
 	for _, issue := range issues {
+		if issue == nil {
+			continue
+		}
 		// regex match the title
 		re, _ := regexp.Compile(`(?i)` + title)
 		if re.MatchString(issue.GetTitle()) || title == issue.GetTitle() {
@@ -158,6 +161,7 @@ func (g *GithubNotifier) GetName() string {
 }
 
 func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface{}) {
+	var err error
 	ghPayload, ok := payload.(GithubNotificationPayload)
 	if !ok {
 		fmt.Fprintln(os.Stderr, "Invalid payload type for GitHub notifier")
@@ -171,12 +175,21 @@ func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface
 		regexTitle := templates.NewTemplate("github-notification-search", template, map[string]interface{}{
 			"Target": ghPayload.Result.Target,
 			"ExpectedVersion": ghPayload.Result.ExpectedVersion,
-			"CurrentVersion":  "([^\\s]+?)\\s",
+			"CurrentVersion":  "{{ .CurrentVersion }}",
 		})
-		titleMatch, _ = regexTitle.Render()
+		tempTemplate, _ := regexTitle.Render()
+		fmt.Fprintf(os.Stderr, "Using template for title match: %s\n", regexEscapeString(tempTemplate))
+		regexTitle = templates.NewTemplate("github-notification-search", regexEscapeString(tempTemplate), map[string]interface{}{
+			"CurrentVersion":  `([^\s]+?)`,
+		})
+		titleMatch, err = regexTitle.Render()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error rendering title match regex: %v\n", err)
+		}
 		fmt.Fprintf(os.Stderr, "Using regex title match: %s\n", titleMatch)
 	}
-
+	titleMatch = strings.TrimSpace(titleMatch)
+	fmt.Fprintf(os.Stderr, "Checking for existing issue with title: %s\n", titleMatch)
 	issues, err := g.findIssue(titleMatch, "open", ghPayload.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
@@ -186,9 +199,9 @@ func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface
 	if issues != nil && len(*issues) > 0 {
 		fmt.Fprintf(os.Stderr, "Issue with title '%s' already exists.\n", ghPayload.Title)
 		// Return true and the existing issues
-		existingIssues := make([]interface{}, len(*issues))
-		for i, issue := range *issues {
-			existingIssues[i] = issue // Convert github.Issue to interface{}
+		existingIssues := []interface{}{}
+		for _, issue := range *issues {
+			existingIssues = append(existingIssues, issue) // Convert github.Issue to interface{}
 		}
 		// this should return []github.Issue or nil if no issue exists
 		return true, existingIssues
@@ -206,7 +219,7 @@ func (g *GithubNotifier) CloseNotification(payload interface{}) error {
 }
 
 func (g *GithubNotifier) ProcessResult(result *providers.ProviderCheckResult) error {
-	fmt.Fprintf(os.Stderr, "Processing result for GitHub notifier: %v\n", result)
+	fmt.Fprintf(os.Stderr, "Processing result for GitHub notifier: %s\n", result.Target.Name)
 	if !g.Enabled {
 		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping processing.")
 		return nil // No processing needed if not enabled
@@ -231,20 +244,19 @@ func (g *GithubNotifier) ProcessResult(result *providers.ProviderCheckResult) er
 			return nil // No existing notification found, nothing to close
 		}
 
-		ghIssues, ok := existingIssues[0].([]github.Issue)
-		if !ok || len(ghIssues) == 0 {
-			fmt.Fprintln(os.Stderr, "No existing issues found to close.")
-			return nil // No existing issues found to close
-		}
-
 		// close them all
-		for _, issue := range ghIssues {
+		for _, issue := range existingIssues {
+			ghIssue, ok := issue.(github.Issue)
+			if !ok {
+				fmt.Fprintln(os.Stderr, "Invalid issue type in existing issues")
+				continue // Skip invalid issue type
+			}
 			fmt.Fprintln(os.Stderr, "Closing notification as the package is no longer outdated.")
-			if err := g.CloseNotification(issue); err != nil {
+			if err := g.CloseNotification(ghIssue); err != nil {
 				fmt.Fprintf(os.Stderr, "Error closing issue with GitHub notifier: %v\n", err)
 				return err // Error occurred while closing issue
 			}
-			fmt.Fprintf(os.Stderr, "Closed issue with number: %d\n", issue.GetNumber())
+			fmt.Fprintf(os.Stderr, "Closed issue with number: %d\n", ghIssue.GetNumber())
 		}
 	} else {
 		fmt.Fprintln(os.Stderr, "No notification needed for this result.")
@@ -340,4 +352,11 @@ func envTemplateValue(template string) string {
 		return template
 	}
 	return rendered
+}
+
+
+func regexEscapeString(s string) string {
+	// Escape special characters for regex
+	re := regexp.MustCompile(`([*+?^$()|[\]])`)
+	return re.ReplaceAllString(s, `\$1`)
 }
