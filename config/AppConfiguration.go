@@ -15,6 +15,7 @@ type AppConfiguration struct {
 				EntriesSelector   string `yaml:"entries"`
 				EvaluatorSelector string `yaml:"evaluator"`
 				BaseSelector      string `yaml:"selector"`
+				IncludePreRelease bool   `yaml:"includePreRelease"`
 			} `yaml:"argo-aoa"`
 		} `yaml:"providers"`
 		Authentication map[string]AuthenticationElement `yaml:"authentication"`

@@ -29,6 +29,8 @@ type ArgoAppOfAppsProvider struct {
 	Evaluator       string           `yaml:"evaluator"`
 	EntriesSelector string           `yaml:"entries"`
 
+	IncludePreRelease bool `yaml:"includePreRelease,omitempty"` // used to include pre-release versions in the evaluation
+
 	TargetNameFrom string `yaml:"nameFrom,omitempty"` // used to set the name of the target from a field in the target map
 
 	config   *config.AppConfiguration `yaml:"-"`
@@ -41,7 +43,8 @@ func NewArgoAppOfAppsProvider(providerElement config.ProviderElement, config *co
 		EntriesSelector: config.Settings.Providers.ArgoAppOfApps.EntriesSelector,
 		Evaluator:       config.Settings.Providers.ArgoAppOfApps.EvaluatorSelector,
 
-		TargetNameFrom: "chartName",
+		TargetNameFrom:    "chartName",
+		IncludePreRelease: config.Settings.Providers.ArgoAppOfApps.IncludePreRelease,
 
 		config:   config,
 		UseCache: true,
@@ -175,7 +178,6 @@ func (p *ArgoAppOfAppsProvider) GetTargets() ([]ProviderTarget, error) {
 }
 
 func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (ProviderCheckResult, error) {
-
 	repoUrl, ok := target.Map["repoURL"].(string)
 	if !ok || repoUrl == "" {
 		err := fmt.Errorf("failed to get repoURL from target: missing or not a string")
@@ -185,7 +187,7 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			CurrentVersion:  "",
 			ExpectedVersion: "",
 			Error:           err.Error(),
-			State: ProviderCheckStateError,
+			State:           ProviderCheckStateError,
 		}, err
 	}
 	targetRevision, ok := target.Map["targetRevision"].(string)
@@ -197,7 +199,7 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			CurrentVersion:  "",
 			ExpectedVersion: "",
 			Error:           err.Error(),
-			State: ProviderCheckStateError,
+			State:           ProviderCheckStateError,
 		}, err
 	}
 
@@ -210,7 +212,7 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			CurrentVersion:  "",
 			ExpectedVersion: "",
 			Error:           fmt.Sprintf("failed to join path: %v", err),
-			State: ProviderCheckStateError,
+			State:           ProviderCheckStateError,
 		}, fmt.Errorf("failed to join path: %w", err)
 	}
 
@@ -224,7 +226,7 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			CurrentVersion:  "",
 			ExpectedVersion: "",
 			Error:           fmt.Sprintf("failed to fetch index.yaml from %s: %v", entriesUrl, err),
-			State: ProviderCheckStateError,
+			State:           ProviderCheckStateError,
 		}, fmt.Errorf("failed to fetch index.yaml from %s: %w", entriesUrl, err)
 	}
 	queryTemplate := templates.NewTemplate("query", p.EntriesSelector, target)
@@ -236,7 +238,7 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			CurrentVersion:  "",
 			ExpectedVersion: "",
 			Error:           fmt.Errorf("failed to render query template: %w", err).Error(),
-			State: ProviderCheckStateError,
+			State:           ProviderCheckStateError,
 		}, fmt.Errorf("failed to render query template: %w", err)
 	}
 
@@ -253,7 +255,9 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 
 	// logrus.Debugf("Evaluating query '%s' on index.yaml", query)
 	evaluator := yq.NewStringEvaluator()
+	os.Setenv("ABYSSAL_INCLUDE_PRERELEASE", fmt.Sprintf("%t", p.IncludePreRelease)) // Disable yq debug output
 	result, err := evaluator.Evaluate(query, string(entriesYaml), encoder, decoder)
+	os.Unsetenv("ABYSSAL_INCLUDE_PRERELEASE") // Unset the environment variable
 
 	if err != nil {
 		return ProviderCheckResult{
@@ -363,14 +367,6 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableHeader() string {
 	</thead>
 	<tbody>`
 }
-
-// func (p *ArgoAppOfAppsProvider) GenerateMarkdown(result ProviderCheckResult) string {
-// 	builder := strings.Builder{}
-// 	builder.WriteString(fmt.Sprintf("## %s\n\n", p.GetName()))
-// 	builder.WriteString(p.GetMarkdownTableHeader())
-// 	builder.WriteString(p.GetMarkdownTableRow(result))
-// 	return builder.String()
-// }
 
 func (p *ArgoAppOfAppsProvider) GetMarkdownTableFooter() string {
 	return `</tbody>
