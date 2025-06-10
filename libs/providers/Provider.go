@@ -1,11 +1,7 @@
 package providers
 
 import (
-	"fmt"
-	"os"
 	"strings"
-
-	"github.com/camalot/abyssal/libs/templates"
 )
 
 type ProviderCheckResult struct {
@@ -53,41 +49,11 @@ type ProviderTarget struct {
 	Map    map[string]interface{} `yaml:",inline"`
 }
 
-
-type EnvironmentVariableTemplateData struct {
-	EnvironmentVariables map[string]string
-}
-
-func envTemplateValue(template string) string {
-	// This function should implement the logic to render a template with environment variables
-	// create a map of environment variables from os.Environ
-	envVars := make(map[string]string)
-
-	for _, env := range os.Environ() {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			// fmt.Printf("Adding env var: %s=%s\n", parts[0], parts[1])
-			envVars[parts[0]] = parts[1]
-		}
-	}
-	result := templates.NewTemplate("templated-value", template, &EnvironmentVariableTemplateData{
-		EnvironmentVariables: envVars,
-	})
-	rendered, err := result.Render()
-	if err != nil {
-		return template
-	}
-	fmt.Fprintf(os.Stderr, "Rendered template '%s' to '%s...'\n", template, rendered[:5])
-	return rendered
-}
-
 func cleanValueForVersion(value string) string {
 	// Remove any leading or trailing whitespace
 	value = strings.TrimSpace(value)
-
 	// Remove any leading 'v' character
 	value = strings.TrimPrefix(value, "v")
-
 	// remove any quotes
 	value = strings.Trim(value, "\"'")
 

@@ -29,17 +29,17 @@ type GithubNotifier struct {
 func NewGithubNotifier(notifierElement config.NotifierElement, config *config.AppConfiguration) *GithubNotifier {
 	repoName := "default-repo"
 	if val, ok := notifierElement.Extra["repository"]; ok {
-		repoName = envTemplateValue(val.(string))
+		repoName = templates.EnvironmentVariableTemplate(val.(string))
 	}
 
 	org := "default-org"
 	if val, ok := notifierElement.Extra["organization"]; ok {
-		org = envTemplateValue(val.(string))
+		org = templates.EnvironmentVariableTemplate(val.(string))
 	}
 
 	token := ""
 	if val, ok := notifierElement.Extra["token"]; ok {
-		token = envTemplateValue(val.(string))
+		token = templates.EnvironmentVariableTemplate(val.(string))
 	}
 
 	labels := []string{}
@@ -69,6 +69,10 @@ type GithubNotificationPayload struct {
 }
 
 func (g *GithubNotifier) createIssue(title, body string, labels []string) error {
+	if !g.Enabled {
+		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping issue creation.")
+		return nil // No issue created if not enabled
+	}
 	fmt.Fprintf(os.Stderr, "Creating issue with title: %s\n", title)
 	fmt.Fprintf(os.Stderr, "Creating issue with body: %s\n", body)
 	fmt.Fprintf(os.Stderr, "Creating issue with labels: %v\n", labels)
@@ -88,6 +92,15 @@ func (g *GithubNotifier) createIssue(title, body string, labels []string) error 
 }
 
 func (g *GithubNotifier) commentOnIssue(issue github.Issue, comment string) error {
+	if !g.Enabled {
+		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping commenting on issue.")
+		return nil // No comment made if not enabled
+	}
+	if comment == "" {
+		fmt.Fprintln(os.Stderr, "No comment provided, skipping commenting on issue.")
+		return nil // No comment made if comment is empty
+	}
+
 	fmt.Fprintf(os.Stderr, "Commenting on issue with number: %d\n", issue.GetNumber())
 	fmt.Fprintf(os.Stderr, "Comment content: %s\n", comment)
 
@@ -111,6 +124,10 @@ func (g *GithubNotifier) closeIssue(issue github.Issue) error {
 }
 
 func (g *GithubNotifier) findIssue(title, state string, labels []string) (*[]github.Issue, error) {
+	if !g.Enabled {
+		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping issue search.")
+		return nil, nil // No issue found if not enabled
+	}
 	// print to stderror for debugging
 	fmt.Fprintf(os.Stderr, "Searching for issue with title: %s\n", title)
 	client := github.NewClient(nil).WithAuthToken(g.AccessToken)
@@ -187,11 +204,11 @@ func (g *GithubNotifier) CloseNotification(payload interface{}) error {
 }
 
 func (g *GithubNotifier) ProcessResult(result *providers.ProviderCheckResult) error {
-	fmt.Fprintf(os.Stderr, "Processing result for GitHub notifier: %s\n", result.Target.Name)
 	if !g.Enabled {
 		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping processing.")
 		return nil // No processing needed if not enabled
 	}
+	fmt.Fprintf(os.Stderr, "Processing result for GitHub notifier: %s\n", result.Target.Name)
 
 	payload, err := g.CreatePayload(g.NotifierConfig, result)
 	if err != nil {
@@ -236,9 +253,9 @@ func (g *GithubNotifier) ProcessResult(result *providers.ProviderCheckResult) er
 // Notify sends a notification with the given payload.
 func (g *GithubNotifier) Notify(payload interface{}) error {
 	if !g.Enabled {
+		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping notification.")
 		return nil // No notification sent if not enabled
 	}
-
 
 	if !g.NeedsNotification(payload) {
 		return nil // No notification needed if already exists
@@ -358,4 +375,3 @@ func (g *GithubNotifier) NeedsNotification(payload interface{}) bool {
 	fmt.Fprintf(os.Stderr, "No existing issue found with title '%s'. Proceeding to create a new issue.\n", ghPayload.Title)
 	return true
 }
-

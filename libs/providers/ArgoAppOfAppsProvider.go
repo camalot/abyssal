@@ -502,8 +502,8 @@ func (p *ArgoAppOfAppsProvider) getURLContent(baseUrl string, pathSegments ...st
 				client = &http.Client{
 					Transport: &basicAuthTransport{
 						base:     http.DefaultTransport,
-						username: envTemplateValue(auth.Username),
-						password: envTemplateValue(auth.Password),
+						username: templates.EnvironmentVariableTemplate(auth.Username),
+						password: templates.EnvironmentVariableTemplate(auth.Password),
 					},
 					Timeout: 10 * time.Second,
 				}
@@ -512,13 +512,13 @@ func (p *ArgoAppOfAppsProvider) getURLContent(baseUrl string, pathSegments ...st
 				client = &http.Client{
 					Transport: &authTransport{
 						base:       http.DefaultTransport,
-						authHeader: fmt.Sprintf("Token %s", envTemplateValue(auth.Token)),
+						authHeader: fmt.Sprintf("Token %s", templates.EnvironmentVariableTemplate(auth.Token)),
 					},
 					Timeout: 10 * time.Second,
 				}
 
 			case "bearer":
-				token := envTemplateValue(auth.Token)
+				token := templates.EnvironmentVariableTemplate(auth.Token)
 				if token == "" {
 					return nil, fmt.Errorf("bearer token is empty for %s", normalizedBaseUrl.String())
 				}

@@ -3,6 +3,7 @@ package notifiers
 import (
 	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/providers"
+	"github.com/camalot/abyssal/libs/templates"
 )
 
 /*
@@ -31,18 +32,25 @@ type JiraNotifier struct {
 	Project   string `yaml:"project,omitempty"`
 	IssueType string `yaml:"issueType,omitempty"`
 
-	Authentication struct {
-		User  string `yaml:"user,omitempty"`
-		Token string `yaml:"token,omitempty"`
-	}
+	Authentication JiraNotifierAuthentication `yaml:"authentication,omitempty"`
 
 	NotifierConfig config.NotifierElement `yaml:"-"`
+}
+
+type JiraNotifierAuthentication struct {
+	User  string `yaml:"user,omitempty"`
+	Token string `yaml:"token,omitempty"`
 }
 
 func NewJiraNotifier(notifierElement config.NotifierElement, config *config.AppConfiguration) *JiraNotifier {
 	token := ""
 	if val, ok := notifierElement.Extra["token"]; ok {
-		token = envTemplateValue(val.(string))
+		token = templates.EnvironmentVariableTemplate(val.(string))
+	}
+
+	username := ""
+	if val, ok := notifierElement.Extra["user"]; ok {
+		username = templates.EnvironmentVariableTemplate(val.(string))
 	}
 
 	labels := []string{}
@@ -61,6 +69,24 @@ func NewJiraNotifier(notifierElement config.NotifierElement, config *config.AppC
 		body = val.(string)
 	}
 
+	url := ""
+	if val, ok := notifierElement.Extra["url"]; ok {
+		url = templates.EnvironmentVariableTemplate(val.(string))
+	}
+
+	project := ""
+	if val, ok := notifierElement.Extra["project"]; ok {
+		project = templates.EnvironmentVariableTemplate(val.(string))
+	}
+
+	issueType := ""
+	if val, ok := notifierElement.Extra["issueType"]; ok {
+		issueType = templates.EnvironmentVariableTemplate(val.(string))
+	}
+	if issueType == "" {
+		issueType = "Task" // Default issue type if not specified
+	}
+
 	return &JiraNotifier{
 		Enabled:        notifierElement.Enabled,
 		Title:          title,
@@ -68,6 +94,14 @@ func NewJiraNotifier(notifierElement config.NotifierElement, config *config.AppC
 		AccessToken:    token,
 		IssueLabels:    labels,
 		NotifierConfig: notifierElement,
+
+		Url:            url,
+		Project:        project,
+		IssueType:      issueType,
+		Authentication: JiraNotifierAuthentication{
+			User:  templates.EnvironmentVariableTemplate(username),
+			Token: templates.EnvironmentVariableTemplate(token),
+		},
 	}
 }
 
@@ -103,9 +137,7 @@ func (j *JiraNotifier) CreatePayload(config config.NotifierElement, result *prov
 	return nil, nil
 }
 func (j *JiraNotifier) GetNotifierConfig() config.NotifierElement {
-	// Implementation for sending a notification to Jira
-	// This would typically involve using the Jira API to create an issue or comment
-	return config.NotifierElement{}
+	return j.NotifierConfig
 }
 
 func (j *JiraNotifier) ProcessResult(result *providers.ProviderCheckResult) error {
@@ -114,14 +146,18 @@ func (j *JiraNotifier) ProcessResult(result *providers.ProviderCheckResult) erro
 	return nil
 }
 
+// IsEnabled checks if the notifier is enabled.
+// This method can be used to determine if the notifier should send notifications.
 func (j *JiraNotifier) IsEnabled() bool {
-	// Implementation for sending a notification to Jira
-	// This would typically involve using the Jira API to create an issue or comment
-	return false
+	return j.Enabled
 }
+
+// GetName returns the name of the notifier.
 func (j *JiraNotifier) GetName() string {
 	return "Jira Notifier"
 }
+
+// GetType returns the type of the notifier.
 func (j *JiraNotifier) GetType() string {
 	return "jira"
 }
