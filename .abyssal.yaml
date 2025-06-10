@@ -57,12 +57,14 @@ settings:
       title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
         Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
-      user: "{{ .EnvironmentVariables.JIRA_USER }}"
+      user: "{{ .EnvironmentVariables.JIRA_USERNAME }}"
       token: "{{ .EnvironmentVariables.JIRA_TOKEN }}"
       url: "{{ .EnvironmentVariables.JIRA_URL }}"
-      project: "{{ .EnvironmentVariables.JIRA_PROJECT }}"
+      project: "{{ .EnvironmentVariables.JIRA_PROJECT_KEY }}"
+      board: "{{ .EnvironmentVariables.JIRA_BOARD_ID }}"
       issueType: "{{ .EnvironmentVariables.JIRA_ISSUE_TYPE }}"
       labels: ["abyssal"]
+      payload: {}
 
 
 providers:
