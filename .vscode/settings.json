@@ -17,6 +17,7 @@
     "govet",
     "Haximus",
     "Infof",
+    "jiramodels",
     "joho",
     "logrus",
     "mikefarah",
