@@ -64,6 +64,11 @@ type JiraNotificationPayload struct {
 	Result *providers.ProviderCheckResult `json:"result,omitempty"` // This can be used to store the result of the check that triggered the notification
 }
 
+// NewJiraNotifier creates a new JiraNotifier instance based on the provided notifierElement and app configuration.
+// It extracts the necessary fields from the notifierElement's Extra map and initializes the JiraNotifier struct.
+// The function handles environment variable templates for fields like token, user, url, project, board, issueType, and jql.
+// It also converts the labels from a raw list to a string slice.
+// This function is used to set up the Jira notifier with the required configuration for sending notifications.
 func NewJiraNotifier(notifierElement config.NotifierElement, config *config.AppConfiguration) *JiraNotifier {
 	token := ""
 	if val, ok := notifierElement.Extra["token"]; ok {
@@ -146,6 +151,8 @@ func NewJiraNotifier(notifierElement config.NotifierElement, config *config.AppC
 	}
 }
 
+// arrayToJqlList converts a slice of strings to a JQL list format.
+// It formats the strings as a comma-separated list enclosed in double quotes.
 func arrayToJqlList(array []string) string {
 	if len(array) == 0 {
 		return ""
@@ -160,6 +167,10 @@ func arrayToJqlList(array []string) string {
 	return jqlList
 }
 
+// createJiraV2Client creates a new Jira v2 client using the provided URL and authentication token.
+// It returns the client or an error if the notifier is not enabled or if there is an error creating the client.
+// This method is used to establish a connection to the Jira API for performing operations like creating issues or comments.
+// It uses the Jira v2 client for compatibility with the Jira API.
 func (j *JiraNotifier) createJiraV2Client() (*jira2.Client, error) {
 	if !j.Enabled {
 		return nil, fmt.Errorf("createJiraV2Client called on disabled Jira notifier")
@@ -182,6 +193,10 @@ func (j *JiraNotifier) createJiraV2Client() (*jira2.Client, error) {
 	return client, nil
 }
 
+// createJiraClient creates a new Jira client using the provided URL and authentication token.
+// It returns the client or an error if the notifier is not enabled or if there is an error creating the client.
+// This method is used to establish a connection to the Jira API for performing operations like creating issues or comments.
+// It uses the Jira v3 client for compatibility with the Jira API.
 func (j *JiraNotifier) createJiraClient() (*jira.Client, error) {
 	if !j.Enabled {
 		return nil, fmt.Errorf("createJiraClient called on disabled Jira notifier")
@@ -204,6 +219,45 @@ func (j *JiraNotifier) createJiraClient() (*jira.Client, error) {
 	return client, nil
 }
 
+// createIssue creates a new Jira issue with the given title, body, and labels.
+// It uses the Jira client to perform the issue creation operation.
+// If the notifier is not enabled, it returns an error.
+// The title and body are used to set the issue's summary and description, respectively.
+func (j *JiraNotifier) createIssue(title, body string, labels []string) error {
+	if !j.Enabled {
+		return fmt.Errorf("createIssue called on disabled Jira notifier")
+	}
+	client, err := j.createJiraV2Client()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating Jira client: %v\n", err)
+		return err
+	}
+
+	issue := jiramodels.IssueSchemeV2{
+		Fields: &jiramodels.IssueFieldsSchemeV2{
+			Summary:     title,
+			Description: body,
+			Project: &jiramodels.ProjectScheme{
+				Key: j.Project,
+			},
+			IssueType: &jiramodels.IssueTypeScheme{
+				Name: j.IssueType,
+			},
+		},
+	}
+
+	_, _, err = client.Issue.Create(context.Background(), &issue, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating Jira issue: %v\n", err)
+		return err
+	}
+	return nil
+}
+
+// commentOnIssue adds a comment to the given Jira issue.
+// It uses the Jira client to perform the comment operation.
+// If the notifier is not enabled, it returns an error.
+// The comment is provided as a string and is added to the issue's comments.
 func (j *JiraNotifier) commentOnIssue(issue *jiramodels.IssueScheme, comment string) error {
 	if !j.Enabled {
 		return fmt.Errorf("commentOnIssue called on disabled Jira notifier")
@@ -226,6 +280,9 @@ func (j *JiraNotifier) commentOnIssue(issue *jiramodels.IssueScheme, comment str
 	return nil
 }
 
+// closeIssue closes the given Jira issue by updating its status to "Done".
+// It uses the Jira client to perform the update operation.
+// If the notifier is not enabled, it returns an error.
 func (j *JiraNotifier) closeIssue(issue *jiramodels.IssueScheme) error {
 	if !j.Enabled {
 		return fmt.Errorf("closeIssue called on disabled Jira notifier")
@@ -252,6 +309,9 @@ func (j *JiraNotifier) closeIssue(issue *jiramodels.IssueScheme) error {
 	return nil
 }
 
+// findIssues searches for existing Jira issues based on the title, states, and labels.
+// It constructs a JQL query using the provided parameters and returns a list of issues that match the criteria.
+// If the notifier is not enabled, it returns an error.
 func (j *JiraNotifier) findIssues(title string, states []string, labels []string) ([]*jiramodels.IssueScheme, error) {
 	if !j.Enabled {
 		return nil, fmt.Errorf("findIssues called on disabled Jira notifier")
@@ -294,6 +354,9 @@ func (j *JiraNotifier) findIssues(title string, states []string, labels []string
 	return issues.Issues, nil
 }
 
+// getHost extracts the host from the Jira notifier URL.
+// It returns an error if the URL is not set or if there is an error parsing the URL.
+// This method is used to ensure that the notifier has a valid host to connect to Jira.
 func (j *JiraNotifier) getHost() (string, error) {
 	if j.Url == "" {
 		return "", fmt.Errorf("jira notifier URL is not set. Please check your configuration")
@@ -307,12 +370,50 @@ func (j *JiraNotifier) getHost() (string, error) {
 }
 
 // Notify sends a notification with the given payload.
+// It checks if the notifier is enabled, if a notification is needed, and if there are existing issues to close.
+// If the notifier is not enabled, it prints a message to stderr and returns nil.
 func (j *JiraNotifier) Notify(payload interface{}) error {
 	if !j.Enabled {
-		return nil
+		fmt.Fprintln(os.Stderr, "Jira notifier is not enabled, skipping notification.")
+		return nil // No notification sent if not enabled
 	}
-	// Implementation for sending a notification to Jira
-	// This would typically involve using the Jira API to create an issue or comment
+
+	if !j.NeedsNotification(payload) {
+		return nil // No notification needed if already exists
+	}
+
+	// clean up existing issues if NeedsNotification
+	hasExistingIssues, existingIssues := j.HasNotification(payload)
+
+	if hasExistingIssues && existingIssues != nil && len(existingIssues) > 0 {
+		fmt.Fprintln(os.Stderr, "Found existing issues, closing them before creating a new one.")
+		for _, issue := range existingIssues {
+			jIssue, ok := issue.(jiramodels.IssueScheme)
+			if !ok {
+				fmt.Fprintln(os.Stderr, "Invalid issue type in existing issues")
+				continue // Skip invalid issue type
+			}
+			fmt.Fprintf(os.Stderr, "Closing existing issue with key: %s\n", jIssue.Key)
+			if err := j.CloseNotification(jIssue); err != nil {
+				fmt.Fprintf(os.Stderr, "Error closing existing issue with Jira notifier: %v\n", err)
+				return err // Error occurred while closing existing issue
+			}
+			fmt.Fprintf(os.Stderr, "Closed existing issue with key: %s\n", jIssue.Key)
+		}
+	}
+
+	jPayload, ok := payload.(JiraNotificationPayload)
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid payload type for Jira notifier")
+		return nil // Invalid payload type
+	}
+
+	err := j.createIssue(jPayload.Title, jPayload.Body, j.IssueLabels)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating Jira issue: %v\n", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -342,6 +443,10 @@ func (j *JiraNotifier) NeedsNotification(payload interface{}) bool {
 	return true
 }
 
+// HasNotification checks if there is an existing notification for the given payload.
+// It searches for existing Jira issues based on the title and labels.
+// If the notifier is not enabled, it returns false and nil.
+// If there are existing issues, it returns true and a list of those issues.
 func (j *JiraNotifier) HasNotification(payload interface{}) (bool, []interface{}) {
 	if !j.Enabled {
 		return false, nil
@@ -366,6 +471,13 @@ func (j *JiraNotifier) HasNotification(payload interface{}) (bool, []interface{}
 	return true, issuesList
 }
 
+// CloseNotification closes the notification for the given payload.
+// This method is used to close an existing notification, typically when the package is no longer outdated.
+// It takes a payload of type jiramodels.IssueScheme, which represents the Jira issue to be closed.
+// It returns an error if the payload is not of the expected type or if there is an error while closing the issue.
+// If the notifier is not enabled, it returns nil without performing any action.
+// It also comments on the issue to indicate that it is being closed due to the package no longer being outdated.
+// If the payload is not of type jiramodels.IssueScheme, it prints an error message to stderr and returns an error.
 func (j *JiraNotifier) CloseNotification(payload interface{}) error {
 	if !j.Enabled {
 		return nil
