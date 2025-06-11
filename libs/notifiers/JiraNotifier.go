@@ -9,10 +9,12 @@ import (
 	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/providers"
 	"github.com/camalot/abyssal/libs/templates"
-	jira "github.com/ctreminiom/go-atlassian/v2/jira/v3"
 	jira2 "github.com/ctreminiom/go-atlassian/v2/jira/v2"
+	jira "github.com/ctreminiom/go-atlassian/v2/jira/v3"
 	jiramodels "github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 )
+
+// https://docs.go-atlassian.io/jira-software-cloud/issues/comments
 
 /*
 - type: jira
@@ -250,7 +252,7 @@ func (j *JiraNotifier) closeIssue(issue *jiramodels.IssueScheme) error {
 	return nil
 }
 
-func (j *JiraNotifier) findIssues(title string, states []string, labels []string) ([]*jiramodels.IssueScheme, error){
+func (j *JiraNotifier) findIssues(title string, states []string, labels []string) ([]*jiramodels.IssueScheme, error) {
 	if !j.Enabled {
 		return nil, fmt.Errorf("findIssues called on disabled Jira notifier")
 	}
@@ -337,7 +339,8 @@ func (j *JiraNotifier) NeedsNotification(payload interface{}) bool {
 		return false // Notification already exists
 	}
 	fmt.Fprintf(os.Stderr, "No existing issue found with title '%s'. Proceeding to create a new issue.\n", jPayload.Title)
-	return true}
+	return true
+}
 
 func (j *JiraNotifier) HasNotification(payload interface{}) (bool, []interface{}) {
 	if !j.Enabled {
