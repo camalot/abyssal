@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/camalot/abyssal/config"
 	"github.com/camalot/abyssal/libs/providers"
@@ -60,6 +62,8 @@ type JiraNotificationPayload struct {
 	Title       string   `json:"title"`
 	Body        string   `json:"body"`
 	IssueLabels []string `json:"issueLabels,omitempty"`
+
+	Search      string   `json:"-"` // This can be used to store the search query for existing issues
 
 	Result *providers.ProviderCheckResult `json:"result,omitempty"` // This can be used to store the result of the check that triggered the notification
 }
@@ -151,6 +155,11 @@ func NewJiraNotifier(notifierElement config.NotifierElement, config *config.AppC
 	}
 }
 
+func jqlEscapeString(s string) string {
+	re := regexp.MustCompile(`(['"\\\]\[])`)
+	return re.ReplaceAllString(s, `\\$1`)
+}
+
 // arrayToJqlList converts a slice of strings to a JQL list format.
 // It formats the strings as a comma-separated list enclosed in double quotes.
 func arrayToJqlList(array []string) string {
@@ -159,10 +168,14 @@ func arrayToJqlList(array []string) string {
 	}
 	jqlList := ""
 	for i, item := range array {
+		s := strings.TrimSpace(item)
+		if s == "" {
+			continue // Skip empty strings
+		}
 		if i > 0 {
 			jqlList += ", "
 		}
-		jqlList += fmt.Sprintf("\"%s\"", item)
+		jqlList += fmt.Sprintf("\"%s\"", strings.TrimSpace(item))
 	}
 	return jqlList
 }
@@ -260,7 +273,7 @@ func (j *JiraNotifier) createIssue(title, body string, labels []string) error {
 // It uses the Jira client to perform the comment operation.
 // If the notifier is not enabled, it returns an error.
 // The comment is provided as a string and is added to the issue's comments.
-func (j *JiraNotifier) commentOnIssue(issue *jiramodels.IssueScheme, comment string) error {
+func (j *JiraNotifier) commentOnIssue(issue *jiramodels.IssueSchemeV2, comment string) error {
 	if !j.Enabled {
 		return fmt.Errorf("commentOnIssue called on disabled Jira notifier")
 	}
@@ -282,31 +295,82 @@ func (j *JiraNotifier) commentOnIssue(issue *jiramodels.IssueScheme, comment str
 	return nil
 }
 
+func (j *JiraNotifier) getTransitions(issue *jiramodels.IssueSchemeV2) ([]*jiramodels.IssueTransitionScheme, error) {
+	if !j.Enabled {
+		return nil, fmt.Errorf("getTransitions called on disabled Jira notifier")
+	}
+	client, err := j.createJiraV2Client()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating Jira client: %v\n", err)
+		return nil, err
+	}
+
+	transitions, response, err := client.Issue.Transitions(context.Background(), issue.ID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting transitions for Jira issue: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Response Status: %s\n", response.Status)
+		fmt.Fprintf(os.Stderr, "Response Body: %s\n", response.Bytes.String())
+		return nil, err
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("error getting transitions for Jira issue: %s", response.Status)
+	}
+
+	return transitions.Transitions, nil
+}
+
 // closeIssue closes the given Jira issue by updating its status to "Done".
 // It uses the Jira client to perform the update operation.
 // If the notifier is not enabled, it returns an error.
-func (j *JiraNotifier) closeIssue(issue *jiramodels.IssueScheme) error {
+func (j *JiraNotifier) closeIssue(issue *jiramodels.IssueSchemeV2) error {
 	if !j.Enabled {
 		return fmt.Errorf("closeIssue called on disabled Jira notifier")
 	}
-	client, err := j.createJiraClient()
+
+	transitions, err := j.getTransitions(issue)
+	if err != nil {
+		return err
+	}
+
+	if len(transitions) == 0 {
+		return fmt.Errorf("no transitions found for Jira issue")
+	}
+	targetTransition := ""
+	// this should be configurable
+	for _, transition := range transitions {
+		if transition.Name == "Done" || transition.Name == "Close" || transition.Name == "Resolved" || transition.Name == "Closed" {
+			targetTransition = transition.ID
+			break
+		}
+	}
+
+	client, err := j.createJiraV2Client()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating Jira client: %v\n", err)
 		return err
 	}
 
-	var payload = jiramodels.IssueScheme{
-		Fields: &jiramodels.IssueFieldsScheme{
-			Status: &jiramodels.StatusScheme{
-				Name: "Done", // Assuming "Done" is the status to close the issue
+	var payload = jiramodels.IssueSchemeV2{
+		Fields: &jiramodels.IssueFieldsSchemeV2{
+			Resolution: &jiramodels.ResolutionScheme{
+				Name: "Done", // Assuming "Done" is the resolution name
 			},
 		},
 	}
 
-	_, err = client.Issue.Update(context.Background(), issue.ID, false, &payload, nil, nil)
+	options := &jiramodels.IssueMoveOptionsV2{
+		Fields:       &payload,
+	}
+
+	response, err := client.Issue.Move(context.Background(), issue.ID, targetTransition, options)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error closing Jira issue: %v\n", err)
 		return err
+	}
+	if response.StatusCode != 204 && response.StatusCode != 200 {
+		fmt.Fprintf(os.Stderr, "error closing Jira issue: %s\n", response.Status)
+		fmt.Fprintf(os.Stderr, "Response Body: %s\n", response.Bytes.String())
+		return fmt.Errorf("error closing Jira issue: %s", response.Status)
 	}
 	return nil
 }
@@ -314,34 +378,33 @@ func (j *JiraNotifier) closeIssue(issue *jiramodels.IssueScheme) error {
 // findIssues searches for existing Jira issues based on the title, states, and labels.
 // It constructs a JQL query using the provided parameters and returns a list of issues that match the criteria.
 // If the notifier is not enabled, it returns an error.
-func (j *JiraNotifier) findIssues(title string, states []string, labels []string) ([]*jiramodels.IssueScheme, error) {
+func (j *JiraNotifier) findIssues(title string, notStates []string, labels []string) ([]*jiramodels.IssueSchemeV2, error) {
 	if !j.Enabled {
 		return nil, fmt.Errorf("findIssues called on disabled Jira notifier")
 	}
 
-	client, err := j.createJiraClient()
+	client, err := j.createJiraV2Client()
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating Jira client: %v\n", err)
 		return nil, err
 	}
 
-
 	// take the JQL query from the notifier config
 	// and append the title to it
 	jql := fmt.Sprintf(
-		" %s AND summary ~ \"%s\" AND status IN (%s) AND labels IN (%s)",
+		"%s AND summary ~ \"%s\" AND status NOT IN (%s) AND labels IN (%s)",
 		j.JQL,
-		title,
-		arrayToJqlList(states),
+		jqlEscapeString(strings.TrimSpace(title)),
+		arrayToJqlList(notStates),
 		arrayToJqlList(labels),
 	)
-	fields := []string{"summary", "status", "assignee", "reporter", "created", "updated", "labels"}
-	expands := []string{"renderedFields", "changelog"}
-	issues, response, err := client.Issue.Search.SearchJQL(context.Background(), jql, fields, expands, 1, "")
+	fields := []string{"status"}
+	fmt.Fprintf(os.Stderr, "JQL: %s\n", jql)
+	// expands := []string{"renderedFields", "changelog"}
+	issues, response, err := client.Issue.Search.SearchJQL(context.Background(), jql, fields, nil, 10, "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error searching Jira issues: %v\n", err)
-		fmt.Fprintf(os.Stderr, "JQL: %s\n", jql)
 		fmt.Fprintf(os.Stderr, "Response Status: %s\n", response.Status)
 		fmt.Fprintf(os.Stderr, "Response Body: %s\n", response.Bytes.String())
 		return nil, err
@@ -387,9 +450,9 @@ func (j *JiraNotifier) Notify(payload interface{}) error {
 	if hasExistingIssues && existingIssues != nil && len(existingIssues) > 0 {
 		fmt.Fprintln(os.Stderr, "Found existing issues, closing them before creating a new one.")
 		for _, issue := range existingIssues {
-			jIssue, ok := issue.(jiramodels.IssueScheme)
+			jIssue, ok := issue.(*jiramodels.IssueSchemeV2)
 			if !ok {
-				fmt.Fprintln(os.Stderr, "Invalid issue type in existing issues")
+				fmt.Fprintf(os.Stderr, "Invalid issue type in existing issues: %T\n", issue)
 				continue // Skip invalid issue type
 			}
 			fmt.Fprintf(os.Stderr, "Closing existing issue with key: %s\n", jIssue.Key)
@@ -428,7 +491,9 @@ func (j *JiraNotifier) NeedsNotification(payload interface{}) bool {
 		return false // Invalid payload type
 	}
 	// this finds an existing issue with the exact same title
-	issues, err := j.findIssues(jPayload.Title, []string{"Open", "In Progress"}, j.IssueLabels)
+	// TODO: the notInStates should be configurable
+	notInStates := []string{"Done", "Closed"}
+	issues, err := j.findIssues(jPayload.Title, notInStates, j.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
 		return false // Error occurred while checking for existing issue
@@ -457,7 +522,9 @@ func (j *JiraNotifier) HasNotification(payload interface{}) (bool, []interface{}
 		return false, nil // Invalid payload type
 	}
 
-	issues, err := j.findIssues(jPayload.Title, []string{"Open", "In Progress"}, jPayload.IssueLabels)
+	// TODO: the notInStates should be configurable
+	notInStates := []string{"Done", "Closed"}
+	issues, err := j.findIssues(jPayload.Search, notInStates, jPayload.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error finding Jira issues: %v\n", err)
 		return false, nil
@@ -488,14 +555,14 @@ func (j *JiraNotifier) CloseNotification(payload interface{}) error {
 	if !j.Enabled {
 		return nil
 	}
-	jIssue, ok := payload.(jiramodels.IssueScheme)
+	jIssue, ok := payload.(*jiramodels.IssueSchemeV2)
 	if !ok {
 		fmt.Fprintln(os.Stderr, "Invalid payload type for Jira notifier")
 		return fmt.Errorf("invalid payload type for Jira notifier") // Invalid payload type
 	}
 	fmt.Fprintf(os.Stderr, "Closing notification for issue: %s (%s)\n", jIssue.Key, jIssue.ID)
-	j.commentOnIssue(&jIssue, "Closing this issue as the package is no longer outdated.")
-	return j.closeIssue(&jIssue)
+	j.commentOnIssue(jIssue, "Closing this issue as the package is no longer outdated.")
+	return j.closeIssue(jIssue)
 }
 
 // CreatePayload creates a payload for the Jira notification.
@@ -516,11 +583,22 @@ func (j *JiraNotifier) CreatePayload(config config.NotifierElement, result *prov
 	if err != nil {
 		return nil, err // Error occurred while rendering the body
 	}
+
+	template = templates.NewTemplate("jira-notification-search", j.Title, map[string]interface{}{
+		"Target": result.Target,
+		"CurrentVersion": "*",
+		"ExpectedVersion": "*",
+	})
+	renderedSearch, err := template.Render()
+	if err != nil {
+		return nil, err // Error occurred while rendering the search query
+	}
 	return JiraNotificationPayload{
 		Title:  renderedTitle,
 		Body:   renderedBody,
 		Result: result,
 		IssueLabels: j.IssueLabels,
+		Search: renderedSearch,
 	}, nil
 }
 
@@ -561,9 +639,10 @@ func (j *JiraNotifier) ProcessResult(result *providers.ProviderCheckResult) erro
 
 		// close them all
 		for _, issue := range existingIssues {
-			jIssue, ok := issue.(jiramodels.IssueScheme)
+			jIssue, ok := issue.(*jiramodels.IssueSchemeV2)
 			if !ok {
-				fmt.Fprintln(os.Stderr, "Invalid issue type in existing issues")
+				// print the actual type of the issue
+				fmt.Fprintf(os.Stderr, "Invalid issue type in existing issues: %T\n", issue)
 				continue // Skip invalid issue type
 			}
 			fmt.Fprintln(os.Stderr, "Closing notification as the package is no longer outdated.")
