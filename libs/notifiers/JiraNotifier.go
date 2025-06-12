@@ -244,6 +244,7 @@ func (j *JiraNotifier) createIssue(title, body string, labels []string) error {
 			IssueType: &jiramodels.IssueTypeScheme{
 				Name: j.IssueType,
 			},
+			Labels: labels,
 		},
 	}
 
