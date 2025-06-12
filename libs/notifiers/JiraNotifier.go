@@ -159,7 +159,7 @@ func arrayToJqlList(array []string) string {
 	}
 	jqlList := ""
 	for i, item := range array {
-		if i > 0 && i < len(array)-1 {
+		if i > 0 {
 			jqlList += ", "
 		}
 		jqlList += fmt.Sprintf("\"%s\"", item)
@@ -188,7 +188,8 @@ func (j *JiraNotifier) createJiraV2Client() (*jira2.Client, error) {
 	}
 
 	// Set the authentication token
-	client.Auth.SetBearerToken(j.Authentication.Token)
+	// client.Auth.SetBearerToken(j.Authentication.Token)
+	client.Auth.SetBasicAuth(j.Authentication.User, j.Authentication.Token)
 
 	return client, nil
 }
@@ -214,8 +215,8 @@ func (j *JiraNotifier) createJiraClient() (*jira.Client, error) {
 	}
 
 	// Set the authentication token
-	client.Auth.SetBearerToken(j.Authentication.Token)
-
+	// client.Auth.SetBearerToken(j.Authentication.Token)
+	client.Auth.SetBasicAuth(j.Authentication.User, j.Authentication.Token)
 	return client, nil
 }
 
@@ -316,20 +317,14 @@ func (j *JiraNotifier) findIssues(title string, states []string, labels []string
 	if !j.Enabled {
 		return nil, fmt.Errorf("findIssues called on disabled Jira notifier")
 	}
-	host, err := j.getHost()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting Jira host: %v\n", err)
-		return nil, err
-	}
-	client, err := jira.New(nil, host)
+
+	client, err := j.createJiraClient()
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating Jira client: %v\n", err)
 		return nil, err
 	}
 
-	// if this doesn't work, might have to set to use SetBasicAuth instead
-	client.Auth.SetBearerToken(j.Authentication.Token)
 
 	// take the JQL query from the notifier config
 	// and append the title to it
@@ -345,6 +340,9 @@ func (j *JiraNotifier) findIssues(title string, states []string, labels []string
 	issues, response, err := client.Issue.Search.SearchJQL(context.Background(), jql, fields, expands, 1, "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error searching Jira issues: %v\n", err)
+		fmt.Fprintf(os.Stderr, "JQL: %s\n", jql)
+		fmt.Fprintf(os.Stderr, "Response Status: %s\n", response.Status)
+		fmt.Fprintf(os.Stderr, "Response Body: %s\n", response.Bytes.String())
 		return nil, err
 	}
 	if response.StatusCode != 200 {
@@ -366,7 +364,7 @@ func (j *JiraNotifier) getHost() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return parsedUrl.Host, nil
+	return fmt.Sprintf("%s://%s", parsedUrl.Scheme, parsedUrl.Host), nil
 }
 
 // Notify sends a notification with the given payload.
@@ -451,7 +449,14 @@ func (j *JiraNotifier) HasNotification(payload interface{}) (bool, []interface{}
 	if !j.Enabled {
 		return false, nil
 	}
-	issues, err := j.findIssues(j.Title, []string{"Open", "In Progress"}, j.IssueLabels)
+
+	jPayload, ok := payload.(JiraNotificationPayload)
+	if !ok {
+		fmt.Fprintln(os.Stderr, "Invalid payload type for Jira notifier")
+		return false, nil // Invalid payload type
+	}
+
+	issues, err := j.findIssues(jPayload.Title, []string{"Open", "In Progress"}, jPayload.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error finding Jira issues: %v\n", err)
 		return false, nil
@@ -514,6 +519,7 @@ func (j *JiraNotifier) CreatePayload(config config.NotifierElement, result *prov
 		Title:  renderedTitle,
 		Body:   renderedBody,
 		Result: result,
+		IssueLabels: j.IssueLabels,
 	}, nil
 }
 

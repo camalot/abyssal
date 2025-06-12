@@ -57,6 +57,7 @@ settings:
       title: "[Abyssal] Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}"
       body: |
         Bump {{ .Target.Name }} from v{{ .CurrentVersion }} to v{{ .ExpectedVersion }}.
+      jql: "project = '{{ .EnvironmentVariables.JIRA_PROJECT_KEY }}' AND status != 'Done'"
       user: "{{ .EnvironmentVariables.JIRA_USERNAME }}"
       token: "{{ .EnvironmentVariables.JIRA_TOKEN }}"
       url: "{{ .EnvironmentVariables.JIRA_URL }}"

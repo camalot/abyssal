@@ -123,7 +123,7 @@ func (g *GithubNotifier) closeIssue(issue github.Issue) error {
 	return err
 }
 
-func (g *GithubNotifier) findIssue(title, state string, labels []string) (*[]github.Issue, error) {
+func (g *GithubNotifier) findIssues(title, state string, labels []string) (*[]github.Issue, error) {
 	if !g.Enabled {
 		fmt.Fprintln(os.Stderr, "GitHub notifier is not enabled, skipping issue search.")
 		return nil, nil // No issue found if not enabled
@@ -331,7 +331,7 @@ func (g *GithubNotifier) HasNotification(payload interface{}) (bool, []interface
 	}
 	titleMatch = strings.TrimSpace(titleMatch)
 	fmt.Fprintf(os.Stderr, "Checking for existing issue with title: %s\n", titleMatch)
-	issues, err := g.findIssue(titleMatch, "open", ghPayload.IssueLabels)
+	issues, err := g.findIssues(titleMatch, "open", ghPayload.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
 		return false, nil // Error occurred while checking for existing issue
@@ -362,7 +362,7 @@ func (g *GithubNotifier) NeedsNotification(payload interface{}) bool {
 		return false // Invalid payload type
 	}
 	// this finds an existing issue with the exact same title
-	issues, err := g.findIssue(ghPayload.Title, "open", g.IssueLabels)
+	issues, err := g.findIssues(ghPayload.Title, "open", g.IssueLabels)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking for existing issue: %v\n", err)
 		return false // Error occurred while checking for existing issue
