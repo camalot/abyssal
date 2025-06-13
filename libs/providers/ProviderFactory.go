@@ -14,11 +14,6 @@ func NewProvider(providerElement config.ProviderElement, config *config.AppConfi
 	switch strings.TrimSpace(strings.ToLower(providerElement.Type)) {
 	case "argo-aoa":
 		return NewArgoAppOfAppsProvider(providerElement, config)
-
-	// case "helm":
-	// 	return NewHelmProvider()
-	// case "kustomize":
-	// 	return NewKustomizeProvider()
 	default:
 		return nil
 	}
