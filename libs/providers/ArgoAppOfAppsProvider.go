@@ -29,7 +29,9 @@ type ArgoAppOfAppsProvider struct {
 	Evaluator       string           `yaml:"evaluator"`
 	EntriesSelector string           `yaml:"entries"`
 
-	IncludePreRelease bool `yaml:"includePreRelease,omitempty"` // used to include pre-release versions in the evaluation
+	AssumeRepositoryURL string `yaml:"assumeRepositoryURL,omitempty"` // used to assume the repository URL if not specified in the target
+
+	// IncludePreRelease bool `yaml:"includePreRelease,omitempty"` // used to include pre-release versions in the evaluation
 
 	TargetNameFrom string `yaml:"nameFrom,omitempty"` // used to set the name of the target from a field in the target map
 
@@ -43,8 +45,10 @@ func NewArgoAppOfAppsProvider(providerElement config.ProviderElement, config *co
 		EntriesSelector: config.Settings.Providers.ArgoAppOfApps.EntriesSelector,
 		Evaluator:       config.Settings.Providers.ArgoAppOfApps.EvaluatorSelector,
 
+		AssumeRepositoryURL: config.Settings.Providers.ArgoAppOfApps.AssumeRepositoryURL,
+
 		TargetNameFrom:    "chartName",
-		IncludePreRelease: config.Settings.Providers.ArgoAppOfApps.IncludePreRelease,
+		//IncludePreRelease: config.Settings.Providers.ArgoAppOfApps.IncludePreRelease,
 
 		config:   config,
 		UseCache: true,
@@ -179,7 +183,10 @@ func (p *ArgoAppOfAppsProvider) GetTargets() ([]ProviderTarget, error) {
 
 func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (ProviderCheckResult, error) {
 	repoUrl, ok := target.Map["repoURL"].(string)
-	if !ok || repoUrl == "" {
+	if ( !ok || repoUrl == "" ) && p.AssumeRepositoryURL != "" {
+		repoUrl = p.AssumeRepositoryURL // use the assumed repository URL if not provided
+	} else if (!ok || repoUrl == "") && p.AssumeRepositoryURL == "" {
+		// return a skipped result if no repoURL is provided
 		err := fmt.Errorf("failed to get repoURL from target: missing or not a string")
 		return ProviderCheckResult{
 			Outdated:        false,
@@ -397,6 +404,13 @@ func (p *ArgoAppOfAppsProvider) getStatusIcon(result ProviderCheckResult) string
 }
 
 func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(result ProviderCheckResult) string {
+	repoURL, ok := result.Target.Map["repoURL"].(string)
+	if (!ok || repoURL == "") && p.AssumeRepositoryURL != "" {
+		repoURL = p.AssumeRepositoryURL // use the assumed repository URL if not provided
+	} else if !ok || repoURL == "" {
+		repoURL = "N/A"
+	}
+
 	status := p.getStatusIcon(result)
 	rows := strings.Builder{}
 	row := fmt.Sprintf(`
@@ -410,7 +424,7 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(result ProviderCheckResult) 
 		</tr>`,
 		result.Target.Name,
 		result.Target.Source,
-		result.Target.Map["repoURL"],
+		repoURL,
 		result.CurrentVersion,
 		result.ExpectedVersion,
 		status,

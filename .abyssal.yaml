@@ -12,9 +12,7 @@ settings:
         | select(.value.chartName!=null and .value.repoURL!=null and .value.targetRevision!=null)
         | [{"chartName": .value.chartName, "repoURL": .value.repoURL, "targetRevision": .value.targetRevision}]
       selector: '.sample.applications'
-      # this is not currently supported. You need to change the entries evaluator to include pre-releases
-      #  if you want to include them.
-      includePreRelease: false
+      assumeRepositoryURL: ''
 
   authentication: {}
 

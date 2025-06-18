@@ -12,10 +12,10 @@ type AppConfiguration struct {
 		Notifiers []NotifierElement `yaml:"notifiers"`
 		Providers struct {
 			ArgoAppOfApps struct {
-				EntriesSelector   string `yaml:"entries"`
-				EvaluatorSelector string `yaml:"evaluator"`
-				BaseSelector      string `yaml:"selector"`
-				IncludePreRelease bool   `yaml:"includePreRelease"`
+				EntriesSelector   	string `yaml:"entries"`
+				EvaluatorSelector 	string `yaml:"evaluator"`
+				BaseSelector      	string `yaml:"selector"`
+				AssumeRepositoryURL string `yaml:"assumeRepositoryURL"`
 			} `yaml:"argo-aoa"`
 		} `yaml:"providers"`
 		Authentication map[string]AuthenticationElement `yaml:"authentication"`
