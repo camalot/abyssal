@@ -3,7 +3,7 @@ module github.com/camalot/abyssal
 go 1.24.3
 
 require (
-	github.com/ctreminiom/go-atlassian/v2 v2.4.0
+	github.com/ctreminiom/go-atlassian/v2 v2.5.0
 	github.com/google/go-github/v72 v72.0.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/joho/godotenv v1.5.1
