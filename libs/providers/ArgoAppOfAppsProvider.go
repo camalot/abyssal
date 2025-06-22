@@ -175,9 +175,7 @@ func (p *ArgoAppOfAppsProvider) GetTargets() ([]ProviderTarget, error) {
 
 	// Convert the targets to a slice of interfaces
 	targets := make([]ProviderTarget, len(p.Targets))
-	for i, target := range p.Targets {
-		targets[i] = target
-	}
+	copy(targets, p.Targets)
 	return targets, nil
 }
 
