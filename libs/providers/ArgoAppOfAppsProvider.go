@@ -37,6 +37,8 @@ type ArgoAppOfAppsProvider struct {
 
 	config   *config.AppConfiguration `yaml:"-"`
 	UseCache bool                     `yaml:"-"`
+
+	TargetCache map[string]string `yaml:"-"`
 }
 
 func NewArgoAppOfAppsProvider(providerElement config.ProviderElement, config *config.AppConfiguration) *ArgoAppOfAppsProvider {
@@ -52,6 +54,8 @@ func NewArgoAppOfAppsProvider(providerElement config.ProviderElement, config *co
 
 		config:   config,
 		UseCache: true,
+
+		TargetCache: make(map[string]string), // Initialize the TargetCache
 	}
 	if providerElement.Extra["useCache"] != nil {
 		if useCache, ok := providerElement.Extra["useCache"].(bool); ok {
@@ -179,6 +183,49 @@ func (p *ArgoAppOfAppsProvider) GetTargets() ([]ProviderTarget, error) {
 	return targets, nil
 }
 
+/**
+ * getTargetCachedContent checks if the target is in the cache and returns the cached content if available.
+ * If the target is not in the cache, it fetches the content from the repository URL and caches it.
+ * It returns a ProviderCheckResult with the expected version and current version.
+ * If the target is not found in the cache, it returns nil.
+ * If there is an error parsing the cached version or current version, it returns an error.
+ */
+func (p *ArgoAppOfAppsProvider) getTargetCachedContent(cacheKey []byte, repoUrl string, target ProviderTarget, targetRevision string) (*ProviderCheckResult, error) {
+	// if cacheKey in TargetCache return the value
+	if cachedValue, ok := p.TargetCache[string(cacheKey[:])]; ok {
+		logrus.Debugf("Cache hit for %s: %s", target.Name, cachedValue)
+		expectedVersion, err := version.NewVersion(cachedValue)
+		if err != nil {
+			logrus.Errorf("Failed to parse cached version %s for %s: %v", cachedValue, target.Name, err)
+			return &ProviderCheckResult{
+				Outdated:        false,
+				Target:          target,
+				CurrentVersion:  "",
+				ExpectedVersion: "",
+				Error:           fmt.Sprintf("failed to parse cached version %s for %s: %v", cachedValue, target.Name, err),
+				State:           ProviderCheckStateError,
+			}, fmt.Errorf("failed to parse cached version %s for %s: %w", cachedValue, target.Name, err)
+		}
+		currentVersion, err := version.NewVersion(targetRevision)
+		if err != nil {
+			logrus.Errorf("Failed to parse current version %s for %s: %v", targetRevision, target.Name, err)
+			return &ProviderCheckResult{
+				Outdated:        false,
+				Target:          target,
+				CurrentVersion:  "",
+				ExpectedVersion: "",
+				Error:           fmt.Sprintf("failed to parse current version %s for %s: %v", targetRevision, target.Name, err),
+				State:           ProviderCheckStateError,
+			}, fmt.Errorf("failed to parse current version %s for %s: %w", targetRevision, target.Name, err)
+		}
+
+		result, err := p.getProviderCheckResult(target, expectedVersion, currentVersion)
+		return &result, err // return the cached result if available
+	}
+
+	return nil, nil // return nil if the target is not in the cache
+}
+
 func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (ProviderCheckResult, error) {
 	repoUrl, ok := target.Map["repoURL"].(string)
 	if ( !ok || repoUrl == "" ) && p.AssumeRepositoryURL != "" {
@@ -207,6 +254,25 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			State:           ProviderCheckStateError,
 		}, err
 	}
+
+	cacheKey := md5.Sum([]byte(repoUrl + target.Name + targetRevision))
+	cached, err := p.getTargetCachedContent(cacheKey[:], repoUrl, target, targetRevision)
+	if err != nil {
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  "",
+			ExpectedVersion: "",
+			Error:           fmt.Sprintf("failed to get cached content for %s: %v", repoUrl, err),
+			State:           ProviderCheckStateError,
+		}, fmt.Errorf("failed to get cached content for %s: %w", repoUrl, err)
+	}
+	if cached != nil {
+		fmt.Fprintf(os.Stderr, "Cache hit for %s:%s\n", target.Name, targetRevision)
+		return *cached, nil // return the cached result if available
+	}
+
+	fmt.Fprintf(os.Stderr, "Cache miss for %s:%s\n", target.Name, targetRevision)
 
 	// pull repo data
 	entriesUrl, err := url.JoinPath(strings.TrimSpace(repoUrl), "index.yaml")
@@ -284,7 +350,6 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 		}, fmt.Errorf("no result found for query '%s' on index.yaml", query)
 	}
 
-	logrus.Debugf("Result of query '%s': %s\n", query, result)
 
 	result = cleanValueForVersion(strings.Trim(strings.TrimSpace(result), "\n"))
 
@@ -301,6 +366,8 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 		}, fmt.Errorf("failed to parse expectedVersion '%s': %w", result, err)
 	}
 
+	p.TargetCache[string(cacheKey[:])] = expectedVersion.String() // cache the expected version
+
 	currentVersion, err := version.NewVersion(targetRevision)
 	if err != nil {
 		return ProviderCheckResult{
@@ -312,42 +379,8 @@ func (p *ArgoAppOfAppsProvider) CheckVersionOutOfDate(target ProviderTarget) (Pr
 			State:           ProviderCheckStateError,
 		}, fmt.Errorf("failed to parse current version '%s': %w", targetRevision, err)
 	}
-	if currentVersion.LessThan(expectedVersion) {
-		logrus.Debugf("%s is out of date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
-		return ProviderCheckResult{
-			Outdated:        true,
-			Target:          target,
-			CurrentVersion:  currentVersion.String(),
-			ExpectedVersion: expectedVersion.String(),
-			State:           ProviderCheckStateSuccess,
-		}, nil
-	} else if currentVersion.Equal(expectedVersion) {
-		logrus.Debugf("%s is up to date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
-		return ProviderCheckResult{
-			Outdated:        false,
-			Target:          target,
-			CurrentVersion:  currentVersion.String(),
-			ExpectedVersion: expectedVersion.String(),
-			State:           ProviderCheckStateSuccess,
-		}, nil
-	} else if currentVersion.GreaterThan(expectedVersion) {
-		return ProviderCheckResult{
-			Outdated:        false,
-			Target:          target,
-			CurrentVersion:  currentVersion.String(),
-			ExpectedVersion: expectedVersion.String(),
-			State:           ProviderCheckStateError,
-		}, fmt.Errorf("%s has a newer version: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
-	} else {
-		return ProviderCheckResult{
-			Outdated:        true,
-			Target:          target,
-			CurrentVersion:  currentVersion.String(),
-			ExpectedVersion: expectedVersion.String(),
-			Error:           fmt.Sprintf("unexpected version comparison: current version %s, expected version %s", currentVersion.String(), expectedVersion.String()),
-			State:           ProviderCheckStateError,
-		}, fmt.Errorf("unexpected version comparison: current version %s, expected version %s", currentVersion.String(), expectedVersion.String())
-	}
+
+	return p.getProviderCheckResult(target, expectedVersion, currentVersion)
 }
 
 func (p *ArgoAppOfAppsProvider) GetName() string {
@@ -439,6 +472,45 @@ func (p *ArgoAppOfAppsProvider) GetMarkdownTableRow(result ProviderCheckResult) 
 	return rows.String()
 }
 
+func (p *ArgoAppOfAppsProvider) getProviderCheckResult(target ProviderTarget, expectedVersion *version.Version, currentVersion *version.Version) (ProviderCheckResult, error) {
+	if currentVersion.LessThan(expectedVersion) {
+		logrus.Debugf("%s is out of date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
+		return ProviderCheckResult{
+			Outdated:        true,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			State:           ProviderCheckStateSuccess,
+		}, nil
+	} else if currentVersion.Equal(expectedVersion) {
+		logrus.Debugf("%s is up to date: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			State:           ProviderCheckStateSuccess,
+		}, nil
+	} else if currentVersion.GreaterThan(expectedVersion) {
+		return ProviderCheckResult{
+			Outdated:        false,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			State:           ProviderCheckStateError,
+		}, fmt.Errorf("%s has a newer version: current version %s, expected version %s", target.Name, currentVersion.String(), expectedVersion.String())
+	} else {
+		return ProviderCheckResult{
+			Outdated:        true,
+			Target:          target,
+			CurrentVersion:  currentVersion.String(),
+			ExpectedVersion: expectedVersion.String(),
+			Error:           fmt.Sprintf("unexpected version comparison: current version %s, expected version %s", currentVersion.String(), expectedVersion.String()),
+			State:           ProviderCheckStateError,
+		}, fmt.Errorf("unexpected version comparison: current version %s, expected version %s", currentVersion.String(), expectedVersion.String())
+	}
+}
+
 func (p *ArgoAppOfAppsProvider) writeCachedContent(cacheKey []byte, content []byte) error {
 	if !p.UseCache {
 		logrus.Debugf("Cache is disabled, not writing content for %x", cacheKey)
@@ -455,7 +527,7 @@ func (p *ArgoAppOfAppsProvider) writeCachedContent(cacheKey []byte, content []by
 
 func (p *ArgoAppOfAppsProvider) getCachedContent(cacheKey []byte, contentURL string) ([]byte, error) {
 	if !p.UseCache {
-		logrus.Debugf("Cache is disabled, fetching content from %s", contentURL)
+		fmt.Fprintf(os.Stderr, "Cache is disabled, fetching content from %s\n", contentURL)
 		return nil, nil // return nil to indicate that we need to fetch the content
 	}
 
@@ -469,10 +541,10 @@ func (p *ArgoAppOfAppsProvider) getCachedContent(cacheKey []byte, contentURL str
 			if err != nil {
 				return nil, fmt.Errorf("failed to read cache file %s: %w", cacheFilePath, err)
 			}
-			logrus.Debugf("Cache hit for %s, returning cached content", contentURL)
+			fmt.Fprintf(os.Stderr, "Cache hit for %s, returning cached content\n", contentURL)
 			return content, nil
 		} else {
-			logrus.Debugf("Cache file %s is older than 24 hours, fetching new content", cacheFilePath)
+			fmt.Fprintf(os.Stderr, "Cache file %s is older than 24 hours, fetching new content\n", cacheFilePath)
 			// if the cache file is older than 24 hours, delete it
 			if err := os.Remove(cacheFilePath); err != nil {
 				return nil, fmt.Errorf("failed to remove old cache file %s: %w", cacheFilePath, err)
@@ -480,7 +552,7 @@ func (p *ArgoAppOfAppsProvider) getCachedContent(cacheKey []byte, contentURL str
 		}
 	}
 
-	logrus.Debugf("Cache miss for %s, fetching from URL", contentURL)
+	fmt.Fprintf(os.Stderr, "Cache miss for %s, fetching from URL\n", contentURL)
 	return nil, nil // return nil to indicate that we need to fetch the content
 }
 

@@ -55,13 +55,13 @@ var ActionCmd = &cobra.Command{
 				continue
 			}
 
-			fmt.Fprintf(os.Stdout, p.GetMarkdownTableHeader())
+			fmt.Fprint(os.Stdout, p.GetMarkdownTableHeader())
 
 			for _, target := range targets {
 				// convert the targets in to Packages
 				result, err := p.CheckVersionOutOfDate(target)
 				if err != nil {
-					fmt.Fprintf(os.Stdout, p.GetMarkdownTableRow(providers.ProviderCheckResult{
+					fmt.Fprint(os.Stdout, p.GetMarkdownTableRow(providers.ProviderCheckResult{
 						Outdated:        result.Outdated,
 						CurrentVersion:  result.CurrentVersion,
 						ExpectedVersion: result.ExpectedVersion,
