@@ -3,7 +3,7 @@ module github.com/camalot/abyssal
 go 1.24.3
 
 require (
-	github.com/ctreminiom/go-atlassian/v2 v2.5.0
+	github.com/ctreminiom/go-atlassian/v2 v2.8.0
 	github.com/google/go-github/v72 v72.0.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/joho/godotenv v1.5.1
@@ -20,7 +20,6 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/a8m/envsubst v1.4.3 // indirect
 	github.com/alecthomas/participle/v2 v2.1.4 // indirect
-	github.com/bensch777/discord-webhook-golang v0.0.6 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/elliotchance/orderedmap v1.8.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
