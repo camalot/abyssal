@@ -60,7 +60,7 @@ jobs:
           echo "BUILD_ARTIFACT=${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" >> "$GITHUB_ENV"
           rm -rf ./bin
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ env.PROJECT_NAME }}-artifacts-${{ matrix.os }}-${{ matrix.arch }}
           path: artifacts/
